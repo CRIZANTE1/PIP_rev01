@@ -37,14 +37,14 @@ def main():
         show_logout_button()
         front_page()
     
-    # Adiciona navegação por abas para as diferentes páginas
-    tab_calc, tab_history = st.tabs(["Calculadora de Carga", "Histórico de Avaliações"])
+        # Adiciona navegação por abas para as diferentes páginas
+        tab_calc, tab_history = st.tabs(["Calculadora de Carga", "Histórico de Avaliações"])
 
-    with tab_calc:
-        front_page()
-    
-    with tab_history:
-        show_history_page()
+        with tab_calc:
+            front_page()
+        
+        with tab_history:
+            show_history_page()
 
 if __name__ == "__main__":
     main()
