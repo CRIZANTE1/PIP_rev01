@@ -35,7 +35,7 @@ def main():
         st.session_state.user = st.session_state.user if 'user' in st.session_state else None
         show_user_header()
         show_logout_button()
-        front_page()
+        
     
         # Adiciona navegação por abas para as diferentes páginas
         tab_calc, tab_history = st.tabs(["Calculadora de Carga", "Histórico de Avaliações"])
