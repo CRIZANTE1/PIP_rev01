@@ -14,7 +14,7 @@ class PDFQA:
     def __init__(self):
         load_api()  # Carrega a API
         # Seu modelo original para todas as operações
-        self.model = genai.GenerativeModel('gemini-2.5-flash-latest') # Usei o 'latest' para garantir compatibilidade com response_mime_type
+        self.model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
 
     #----------------- Função para fazer perguntas ao modelo Gemini (sua versão original) ----------------------
     def ask_gemini(self, pdf_files, question):
