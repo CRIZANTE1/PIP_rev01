@@ -5,7 +5,8 @@ def show_demo_page():
     Exibe uma página de demonstração para usuários não autorizados.
     """
     st.title("Calculadora de Movimentação de Carga")
-    st.image("https://i.imgur.com/g0h2y1G.png", use_column_width=True) 
+    video_url ='https://youtu.be/N9uRR15_uNg'
+    st.video("video_url") 
 
     st.header("Versão de Demonstração")
     st.warning("🔒 Acesso restrito. Esta é uma versão de demonstração apenas para visualização.")
