@@ -5,8 +5,10 @@ def show_demo_page():
     Exibe uma página de demonstração para usuários não autorizados.
     """
     st.title("Calculadora de Movimentação de Carga")
-    video_url ='https://youtu.be/N9uRR15_uNg'
-    st.video(video_url) 
+
+    # URL do vídeo de demonstração
+    video_url = 'https://youtu.be/N9uRR15_uNg'
+    st.video(video_url)
 
     st.header("Versão de Demonstração")
     st.warning("🔒 Acesso restrito. Esta é uma versão de demonstração apenas para visualização.")
@@ -26,5 +28,8 @@ def show_demo_page():
     **Para obter acesso, por favor, entre em contato com o administrador do sistema.**
     """)
     
-    # MODIFICADO: Mostra o nome do usuário
-    st.info(f"Seu nome de login é: **{st.user.name}**. Se você deveria ter acesso, forneça este nome ao administrador.")
+    try:
+        user_name = st.user.name
+        st.info(f"Seu nome de login é: **{user_name}**. Se você deveria ter acesso, forneça este nome ao administrador.")
+    except Exception:
+        st.info("Para obter acesso, por favor, entre em contato com o administrador do sistema.")
