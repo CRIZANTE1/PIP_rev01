@@ -1,4 +1,3 @@
-from dotenv import load_dotenv
 import os
 import google.generativeai as genai
 import streamlit as st
@@ -22,7 +21,7 @@ def load_api():
         # 2. Se não encontrou nos secrets, tentar carregar do arquivo .env (desenvolvimento)
         if not api_key:
             # Load environment variables from .env file
-            load_dotenv()
+            # load_dotenv()  # Removido para Streamlit Cloud
             api_key = os.getenv('GOOGLE_API_KEY')
             if api_key:
                 logging.info("API key loaded from .env file.")
