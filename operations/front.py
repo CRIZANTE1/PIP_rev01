@@ -3,8 +3,10 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 import time
+
+# Funções e classes do projeto
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
@@ -26,7 +28,7 @@ def mostrar_instrucoes():
             - **Dados do Operador**: Faça o upload da CNH e clique em "Extrair Dados" para preencher as informações do operador.
             - **Dados do Equipamento**: Faça o upload do CRLV para preencher os dados do veículo.
             - **Preenchimento Manual**: Preencha ou corrija os demais campos necessários.
-            - **Documentos**: Faça o upload de todos os outros documentos solicitados.
+            - **Documentos**: Faça o upload de todos os outros documentos solicitados. A IA irá validar os documentos.
         3. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
         """)
 
@@ -74,11 +76,13 @@ def front_page():
         'operador_form', 'cpf_form', 'cnh_form', 'cnh_validade_form', 'cnh_status', 
         'placa_form', 'modelo_form', 'fabricante_form', 'ano_form', 
         'art_num_form', 'art_validade_form', 'art_status', 'obs_form', 
-        'nr11_num_form', 'nr11_validade_form', 'nr11_status', 
+        'nr11_modulo_form', 'nr11_validade_form', 'nr11_status', # Alterado aqui
         'mprev_data_form', 'mprev_prox_form', 'mprev_status'
     ]
     for key in form_keys:
         if key not in st.session_state: st.session_state[key] = ""
+    
+    if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
 
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
@@ -128,7 +132,6 @@ def front_page():
     # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
         st.header("Informações e Documentos do Guindauto")
-        if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
         st.info(f"ID da Avaliação: **{st.session_state.id_avaliacao}**")
         
         uploader = GoogleDriveUploader(); ai_processor = PDFQA()
@@ -164,12 +167,25 @@ def front_page():
                  extracted = ai_processor.extract_structured_data(art_file, get_art_prompt()); 
                  if extracted: st.session_state.art_num_form = extracted.get('numero_art', ''); st.session_state.art_validade_form = extracted.get('validade_art', ''); st.session_state.art_status = extracted.get('status', 'Falha na verificação'); st.rerun()
             st.text_input("Nº ART", key="art_num_form"); st.text_input("Validade ART", key="art_validade_form", disabled=True); display_status(st.session_state.art_status)
+        
         with col_d2:
             st.markdown("**Certificado NR-11**"); nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_uploader")
             if nr11_file and st.button("Verificar NR-11", key="nr11_button"):
                 extracted = ai_processor.extract_structured_data(nr11_file, get_nr11_prompt())
-                if extracted: st.session_state.nr11_num_form = extracted.get('numero_nr11', ''); st.session_state.nr11_validade_form = extracted.get('validade_nr11', ''); st.session_state.nr11_status = extracted.get('status', 'Falha na verificação'); st.rerun()
-            st.text_input("Nº NR-11", key="nr11_num_form"); st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True); display_status(st.session_state.nr11_status)
+                if extracted:
+                    st.session_state.nr11_modulo_form = extracted.get('modulo', 'Não identificado')
+                    st.session_state.nr11_validade_form = extracted.get('validade_nr11', '')
+                    st.session_state.nr11_status = extracted.get('status', 'Falha na verificação')
+                    st.rerun()
+            
+            modulos_nr11 = ["", "Guindauto", "Guindaste", "Munck"]
+            if st.session_state.nr11_modulo_form and st.session_state.nr11_modulo_form not in modulos_nr11:
+                modulos_nr11.append(st.session_state.nr11_modulo_form)
+            
+            st.selectbox("Módulo NR-11", options=modulos_nr11, key="nr11_modulo_form")
+            st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True)
+            display_status(st.session_state.nr11_status)
+            
         with col_d3:
             st.markdown("**Manutenção (M_PREV)**"); mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_uploader")
             if mprev_file and st.button("Verificar Manutenção", key="mprev_button"):
@@ -199,7 +215,7 @@ def front_page():
                         dados_guindauto_row = [
                             id_avaliacao, st.session_state.empresa_form, st.session_state.cnpj_form, st.session_state.telefone_form, st.session_state.email_form,
                             st.session_state.operador_form, st.session_state.cpf_form, st.session_state.cnh_form, st.session_state.cnh_validade_form,
-                            st.session_state.nr11_num_form, st.session_state.placa_form, st.session_state.modelo_form, st.session_state.fabricante_form, st.session_state.ano_form,
+                            st.session_state.nr11_modulo_form, st.session_state.placa_form, st.session_state.modelo_form, st.session_state.fabricante_form, st.session_state.ano_form,
                             st.session_state.mprev_data_form, st.session_state.mprev_prox_form,
                             st.session_state.art_num_form, st.session_state.art_validade_form, st.session_state.obs_form,
                             get_url('art_doc'), get_url('nr11_doc'), get_url('cnh_doc'), get_url('crlv'), get_url('mprev_doc'), get_url('grafico_doc')
