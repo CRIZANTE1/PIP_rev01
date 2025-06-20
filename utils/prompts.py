@@ -43,18 +43,20 @@ def get_cnh_prompt():
     """
 
 def get_nr11_prompt():
-    """Retorna o prompt para extrair dados e status de validade de um Certificado NR-11."""
+    """Retorna o prompt para extrair dados e o tipo de equipamento de um Certificado NR-11."""
     today = date.today().strftime("%Y-%m-%d")
     return f"""
     Você é um assistente especialista em analisar certificados de treinamento de NR-11.
-    Analise o PDF e extraia:
-    1. Nome completo do operador.
-    2. Número do certificado.
-    3. A data de validade do certificado. Se não houver, calcule 1 ano a partir da data de emissão.
-    4. Baseado na data de validade e na data de hoje ({today}), determine o status.
+    Analise o PDF e extraia as seguintes informações:
     
-    Retorne a resposta APENAS em um formato JSON válido com as chaves "nome_operador", "numero_nr11", "validade_nr11" (YYYY-MM-DD), e "status" ("Válido", "Vencido", "Próximo ao Vencimento").
-    Exemplo: {{"nome_operador": "CARLOS PEREIRA", "numero_nr11": "CERT-55443", "validade_nr11": "2024-11-14", "status": "Válido"}}
+    1.  **Nome completo do operador**.
+    2.  **Módulo do Treinamento**: Identifique se o treinamento foi para "Guindauto", "Guindaste" ou "Munck". Se não conseguir identificar, deixe em branco.
+    3.  **Número do Certificado**: O código de identificação do certificado, se houver.
+    4.  **Data de Validade**: Encontre a data de validade. Se não houver, calcule 1 ano a partir da data de emissão.
+    5.  **Status**: Baseado na data de validade e na data de hoje ({today}), determine o status ("Válido", "Vencido", etc.).
+    
+    Retorne a resposta APENAS em um formato JSON válido com as chaves "nome_operador", "modulo", "numero_nr11", "validade_nr11" (YYYY-MM-DD), e "status".
+    Exemplo: {{"nome_operador": "CARLOS PEREIRA", "modulo": "Guindauto", "numero_nr11": "CERT-55443", "validade_nr11": "2024-11-14", "status": "Válido"}}
     """
 
 def get_mprev_prompt():
