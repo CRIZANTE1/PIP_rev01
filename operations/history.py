@@ -1,12 +1,10 @@
-# FILE: operations/history.py
 
 import streamlit as st
 import pandas as pd
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 
-# Usa o cache do Streamlit para evitar carregar os dados do Google Sheets a cada interação.
-# O cache é invalidado a cada 600 segundos (10 minutos) para buscar novos dados.
+
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
     """
@@ -18,14 +16,12 @@ def load_sheet_data(sheet_name):
         data = uploader.get_data_from_sheet(sheet_name)
         
         if not data or len(data) < 2:
-            # Retorna um DataFrame vazio se a planilha não tiver cabeçalho e pelo menos uma linha de dados
             return pd.DataFrame()
             
         headers = data[0]
         rows = data[1:]
         
-        # Garante que todas as linhas tenham o mesmo número de colunas que o cabeçalho
-        # Preenche com None se uma linha for mais curta
+        
         max_cols = len(headers)
         cleaned_rows = []
         for row in rows:
