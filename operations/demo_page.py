@@ -6,7 +6,7 @@ def show_demo_page():
     """
     st.title("Calculadora de Movimentação de Carga")
     video_url ='https://youtu.be/N9uRR15_uNg'
-    st.video("video_url") 
+    st.video(video_url) 
 
     st.header("Versão de Demonstração")
     st.warning("🔒 Acesso restrito. Esta é uma versão de demonstração apenas para visualização.")
