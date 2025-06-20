@@ -1,5 +1,3 @@
-# FILE: front.py
-
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -8,8 +6,6 @@ import uuid
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import time
-
-# Funções e classes do projeto
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
