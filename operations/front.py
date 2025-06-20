@@ -18,15 +18,39 @@ logging.basicConfig(level=logging.INFO)
 
 def mostrar_instrucoes():
     with st.expander("📖 Como usar este aplicativo", expanded=False):
-        st.markdown("""
-        ### Guia Rápido
-        1. **Aba "Dados do Içamento"**: Preencha os dados da carga e do guindaste e clique em **Calcular**.
-        2. **Aba "Informações e Documentos"**:
+        st.markdown("""### Guia de Uso
+        
+        1. **Dados da Carga**:
+           * Digite o peso da carga principal em kg
+           * Selecione se o equipamento é novo ou usado
+             - Novo: aplica margem de segurança de 10%
+             - Usado: aplica margem de segurança de 25%
+           * Informe o peso dos acessórios (cintas, grilhetas, etc.)
+           * O peso dos cabos será calculado automaticamente (3%)
+        
+        2. **Dados do Guindaste**:
+           * Preencha as informações do fabricante e modelo
+           * Informe o raio máximo e sua capacidade
+           * Informe a extensão máxima da lança e sua capacidade
+        
+        3. **Resultados**:
+           * O sistema calculará automaticamente:
+             - Margem de segurança
+             - Peso total a considerar
+             - Peso dos cabos
+             - Carga total final
+           * Validará se o guindaste é adequado
+           * Mostrará as porcentagens de utilização
+        
+        ⚠️ **Importante**: Se a utilização ultrapassar 80%, será necessária aprovação da engenharia e segurança.
+        
+        4. **Aba "Dados do Içamento"**: Preencha os dados da carga e do guindaste e clique em **Calcular**.
+        5. **Aba "Informações e Documentos"**:
             - **Dados do Operador**: Faça o upload da CNH e clique em "Extrair Dados" para preencher as informações do operador.
             - **Dados do Equipamento**: Faça o upload do CRLV para preencher os dados do veículo.
             - **Preenchimento Manual**: Preencha ou corrija os demais campos necessários.
             - **Documentos**: Faça o upload de todos os outros documentos solicitados.
-        3. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
+        6. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
         """)
 
 def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo):
