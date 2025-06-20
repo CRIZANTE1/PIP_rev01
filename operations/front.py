@@ -1,18 +1,15 @@
-
-
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import uuid
-from datetime import datetime, date
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
 import time
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from AI.api_Operation import PDFQA
-from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_nr11_prompt
+from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_nr11_prompt, get_mprev_prompt
 import logging
 
 # Configuração do logging
@@ -52,61 +49,49 @@ def gerar_id_avaliacao():
 
 def handle_upload_with_id(uploader, arquivo, tipo_doc, id_avaliacao):
     if arquivo is None: return None
-    extensao = arquivo.name.split('.')[-1]
-    novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
+    extensao = arquivo.name.split('.')[-1]; novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
     try:
         file_url = uploader.upload_file(arquivo, novo_nome)
         return {'success': True, 'url': file_url, 'nome': novo_nome}
     except Exception as e:
-        st.error(f"Erro no upload de '{novo_nome}': {e}")
-        return {'success': False, 'error': str(e)}
-        
-def parse_date_string(date_str):
-    """Converte uma string YYYY-MM-DD para um objeto date, retorna None se falhar."""
-    if not date_str or not isinstance(date_str, str): return None
-    try: return datetime.strptime(date_str, "%Y-%m-%d").date()
-    except (ValueError, TypeError): return None
+        st.error(f"Erro no upload de '{novo_nome}': {e}"); return {'success': False, 'error': str(e)}
+
+def display_status(status_text):
+    if not status_text: return
+    status_lower = status_text.lower()
+    if "válido" in status_lower or "em dia" in status_lower:
+        st.success(f"Status: {status_text}")
+    elif "vencido" in status_lower:
+        st.error(f"Status: {status_text}")
+    else:
+        st.warning(f"Status: {status_text}")
 
 # --------------------- Página Principal --------------------
-
 def front_page():
-    # Inicialização correta e completa do session_state
-    # Garante que todos os campos existam e tenham um valor padrão compatível
+    # Inicialização do session_state
     form_keys = [
-        'empresa_form', 'cnpj_form', 'telefone_form', 'email_form', 'operador_form', 'cpf_form',
-        'cnh_form', 'cnh_validade_form', 'placa_form', 'modelo_form', 'fabricante_form', 'ano_form',
-        'art_num_form', 'art_validade_form', 'obs_form',
-        'nr11_num_form', 'nr11_data_form', 'nr11_validade_form', 'mprev_data_form', 'mprev_prox_form'
+        'empresa_form', 'cnpj_form', 'telefone_form', 'email_form', 
+        'operador_form', 'cpf_form', 'cnh_form', 'cnh_validade_form', 'cnh_status', 
+        'placa_form', 'modelo_form', 'fabricante_form', 'ano_form', 
+        'art_num_form', 'art_validade_form', 'art_status', 'obs_form', 
+        'nr11_num_form', 'nr11_validade_form', 'nr11_status', 
+        'mprev_data_form', 'mprev_prox_form', 'mprev_status'
     ]
     for key in form_keys:
-        if key not in st.session_state:
-            # Campos de data são inicializados como None
-            if any(s in key for s in ['date', 'validade', 'prox']):
-                st.session_state[key] = None
-            # Ano é inicializado com o ano atual
-            elif key == 'ano_form':
-                st.session_state[key] = date.today().year
-            # Outros campos de texto são inicializados como string vazia
-            else:
-                st.session_state[key] = ""
-    
-    # Inicializa chaves para uploads e dados de içamento se não existirem
-    if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
-    if 'uploads' not in st.session_state: st.session_state.uploads = {}
+        if key not in st.session_state: st.session_state[key] = ""
 
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
     
     tab1, tab2 = st.tabs(["📝 Dados do Içamento", "🏗️ Informações e Documentos"])
 
-    # --- ABA 1: DADOS DO IÇAMENTO E CÁLCULO ---
+    # --- ABA 1: CÁLCULO DE IÇAMENTO ---
     with tab1:
         col1_estado, col2_estado = st.columns(2)
         with col1_estado:
             estado_equipamento = st.radio("Estado do Equipamento", ["Novo", "Usado"], key="estado_equip_radio", help="Novo: 10% de margem. Usado: 25%.")
         if estado_equipamento == "Novo": st.info("Margem de segurança aplicada: 10%")
         else: st.warning("Margem de segurança aplicada: 25%")
-        
         with st.form("formulario_carga"):
             col1, col2 = st.columns(2);
             with col1:
@@ -143,90 +128,57 @@ def front_page():
     # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
         st.header("Informações e Documentos do Guindauto")
+        if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
         st.info(f"ID da Avaliação: **{st.session_state.id_avaliacao}**")
         
         uploader = GoogleDriveUploader(); ai_processor = PDFQA()
         
         st.subheader("📋 Dados da Empresa"); col_c1, col_c2 = st.columns(2)
-        with col_c1:
-            st.session_state.empresa_form = st.text_input("Empresa", value=st.session_state.empresa_form)
-            st.session_state.cnpj_form = st.text_input("CNPJ", value=st.session_state.cnpj_form)
-        with col_c2:
-            st.session_state.telefone_form = st.text_input("Telefone", value=st.session_state.telefone_form)
-            st.session_state.email_form = st.text_input("Email", value=st.session_state.email_form)
+        with col_c1: st.text_input("Empresa", key="empresa_form"); st.text_input("CNPJ", key="cnpj_form")
+        with col_c2: st.text_input("Telefone", key="telefone_form"); st.text_input("Email", key="email_form")
 
-        st.subheader("👤 Dados do Operador (via CNH)"); 
-        cnh_doc_file = st.file_uploader("1. Faça o Upload da CNH (.pdf, .png)", key="cnh_doc_uploader")
-        if cnh_doc_file and st.button("2. Extrair Dados da CNH com IA", key="extract_cnh_button"):
+        st.subheader("👤 Dados do Operador"); 
+        cnh_doc_file = st.file_uploader("1. Upload da CNH (.pdf, .png)", key="cnh_uploader")
+        if cnh_doc_file and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
             extracted = ai_processor.extract_structured_data(cnh_doc_file, get_cnh_prompt())
             if extracted:
-                st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
-                st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
-                st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form)
-                st.session_state.cnh_validade_form = parse_date_string(extracted.get('validade')) # Converte a string para date ou None
-                st.rerun() # Re-executa para atualizar os widgets desabilitados
-        col_op1, col_op2 = st.columns(2)
-        with col_op1:
-            st.text_input("Nome do Operador (extraído)", value=st.session_state.operador_form, disabled=True)
-            st.text_input("CPF (extraído)", value=st.session_state.cpf_form, disabled=True)
-        with col_op2:
-            st.text_input("Número da CNH (extraído)", value=st.session_state.cnh_form, disabled=True)
-            # st.date_input precisa de um objeto date ou None. Garante o tipo aqui.
-            st.date_input("Validade CNH (extraída)", value=st.session_state.cnh_validade_form, disabled=True)
-
-        st.subheader("🏗️ Dados do Equipamento"); crlv_file = st.file_uploader("Upload do CRLV (.pdf)", type='pdf', key="crlv_uploader")
-        if crlv_file and st.button("🔍 Extrair Dados do CRLV", key="extract_crlv_button"):
-            extracted = ai_processor.extract_structured_data(crlv_file, get_crlv_prompt())
-            if extracted:
-                st.session_state.placa_form = extracted.get('placa', st.session_state.placa_form); 
-                st.session_state.ano_form = int(extracted.get('ano_fabricacao') or date.today().year); # Garante que ano seja int
-                st.session_state.modelo_form = extracted.get('marca_modelo', st.session_state.modelo_form);
+                st.session_state.operador_form = extracted.get('nome', ''); st.session_state.cpf_form = extracted.get('cpf', ''); st.session_state.cnh_form = extracted.get('numero_cnh', ''); st.session_state.cnh_validade_form = extracted.get('validade_cnh', ''); st.session_state.cnh_status = extracted.get('status', 'Falha na verificação');
                 st.rerun()
+        col_op1, col_op2 = st.columns(2)
+        with col_op1: st.text_input("Nome", key="operador_form", disabled=True); st.text_input("CPF", key="cpf_form", disabled=True)
+        with col_op2: st.text_input("Nº da CNH", key="cnh_form", disabled=True); st.text_input("Validade CNH", key="cnh_validade_form", disabled=True)
+        display_status(st.session_state.cnh_status)
+
+        st.subheader("🏗️ Dados do Equipamento"); crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_uploader")
+        if crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
+            extracted = ai_processor.extract_structured_data(crlv_file, get_crlv_prompt())
+            if extracted: st.session_state.placa_form = extracted.get('placa', ''); st.session_state.ano_form = extracted.get('ano_fabricacao', ''); st.session_state.modelo_form = extracted.get('marca_modelo', ''); st.rerun()
         col_e1, col_e2 = st.columns(2)
-        with col_e1:
-            st.text_input("Placa Guindaste", value=st.session_state.placa_form)
-            st.text_input("Modelo Equipamento", value=st.session_state.modelo_form)
-        with col_e2:
-            st.text_input("Fabricante Equipamento", value=st.session_state.fabricante_form)
-            st.number_input("Ano Fabricação", min_value=1950, max_value=date.today().year + 1, value=st.session_state.ano_form)
+        with col_e1: st.text_input("Placa", key="placa_form"); st.text_input("Modelo", key="modelo_form")
+        with col_e2: st.text_input("Fabricante", key="fabricante_form"); st.text_input("Ano", key="ano_form")
 
         st.subheader("📄 Documentação e Validades"); col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
             st.markdown("**ART**"); art_file = st.file_uploader("Doc. ART (.pdf)", key="art_uploader")
-            if art_file and st.button("🔍 Extrair Dados da ART", key="extract_art_button"):
+            if art_file and st.button("Verificar ART", key="art_button"):
                  extracted = ai_processor.extract_structured_data(art_file, get_art_prompt()); 
-                 if extracted: st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form); 
-                 st.session_state.art_validade_form = parse_date_string(extracted.get('data_emissao')); # Converte para date ou None
-                 st.rerun()
-            st.text_input("Número ART", value=st.session_state.art_num_form)
-            st.date_input("Validade ART", value=st.session_state.art_validade_form) # Valor garantido como date ou None
+                 if extracted: st.session_state.art_num_form = extracted.get('numero_art', ''); st.session_state.art_validade_form = extracted.get('validade_art', ''); st.session_state.art_status = extracted.get('status', 'Falha na verificação'); st.rerun()
+            st.text_input("Nº ART", key="art_num_form"); st.text_input("Validade ART", key="art_validade_form", disabled=True); display_status(st.session_state.art_status)
         with col_d2:
             st.markdown("**Certificado NR-11**"); nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_uploader")
-            if nr11_file and st.button("🔍 Extrair Dados do NR-11", key="extract_nr11_button"):
+            if nr11_file and st.button("Verificar NR-11", key="nr11_button"):
                 extracted = ai_processor.extract_structured_data(nr11_file, get_nr11_prompt())
-                if extracted:
-                    st.session_state.nr11_num_form = extracted.get('numero_nr11', st.session_state.nr11_num_form); 
-                    st.session_state.nr11_data_form = parse_date_string(extracted.get('data_emissao')); # Converte para date ou None
-                    st.session_state.nr11_validade_form = parse_date_string(extracted.get('validade')); # Converte para date ou None
-                    st.rerun()
-            st.text_input("Número NR-11", value=st.session_state.nr11_num_form)
-            st.date_input("Emissão NR-11", value=st.session_state.nr11_data_form) # Valor garantido como date ou None
-            validade_nr11 = st.session_state.nr11_validade_form if st.session_state.nr11_validade_form else (st.session_state.nr11_data_form + relativedelta(years=1) if st.session_state.nr11_data_form else None)
-            if validade_nr11:
-                if validade_nr11 >= date.today(): st.success(f"Válido até: {validade_nr11.strftime('%d/%m/%Y')}")
-                else: st.error(f"Vencido em: {validade_nr11.strftime('%d/%m/%Y')}")
+                if extracted: st.session_state.nr11_num_form = extracted.get('numero_nr11', ''); st.session_state.nr11_validade_form = extracted.get('validade_nr11', ''); st.session_state.nr11_status = extracted.get('status', 'Falha na verificação'); st.rerun()
+            st.text_input("Nº NR-11", key="nr11_num_form"); st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True); display_status(st.session_state.nr11_status)
         with col_d3:
             st.markdown("**Manutenção (M_PREV)**"); mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_uploader")
-            st.date_input("Data Última Manut.", value=st.session_state.mprev_data_form) # Valor garantido como date ou None
-            if st.session_state.mprev_data_form:
-                st.session_state.mprev_prox_form = st.session_state.mprev_data_form + relativedelta(years=1)
-                if st.session_state.mprev_prox_form >= date.today(): st.success(f"Próxima até: {st.session_state.mprev_prox_form.strftime('%d/%m/%Y')}")
-                else: st.error(f"Vencida desde: {st.session_state.mprev_prox_form.strftime('%d/%m/%Y')}")
-
-        st.subheader("Upload de Gráfico de Carga"); 
-        grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_uploader", label_visibility="collapsed")
-
-        st.text_area("Observações Adicionais", value=st.session_state.obs_form)
+            if mprev_file and st.button("Verificar Manutenção", key="mprev_button"):
+                extracted = ai_processor.extract_structured_data(mprev_file, get_mprev_prompt())
+                if extracted: st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', ''); st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', ''); st.session_state.mprev_status = extracted.get('status', 'Falha na verificação'); st.rerun()
+            st.text_input("Última Manutenção", key="mprev_data_form", disabled=True); st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True); display_status(st.session_state.mprev_status)
+        
+        st.subheader("Upload de Gráfico de Carga"); grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_uploader", label_visibility="collapsed")
+        st.text_area("Observações Adicionais", key="obs_form")
         
         st.divider()
         col_s1, col_s2 = st.columns(2)
@@ -242,15 +194,14 @@ def front_page():
                         if nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, nr11_file, 'nr11_doc', id_avaliacao)
                         if mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, mprev_file, 'mprev_doc', id_avaliacao)
                         if grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, grafico_carga_file, 'grafico_doc', id_avaliacao)
-                        
                         get_url = lambda key: uploads.get(key, {}).get('url', '') if uploads.get(key) else ''
                         
                         dados_guindauto_row = [
                             id_avaliacao, st.session_state.empresa_form, st.session_state.cnpj_form, st.session_state.telefone_form, st.session_state.email_form,
-                            st.session_state.operador_form, st.session_state.cpf_form, st.session_state.cnh_form, st.session_state.cnh_validade_form.isoformat() if st.session_state.cnh_validade_form else '',
+                            st.session_state.operador_form, st.session_state.cpf_form, st.session_state.cnh_form, st.session_state.cnh_validade_form,
                             st.session_state.nr11_num_form, st.session_state.placa_form, st.session_state.modelo_form, st.session_state.fabricante_form, st.session_state.ano_form,
-                            st.session_state.mprev_data_form.isoformat() if st.session_state.mprev_data_form else '', st.session_state.mprev_prox_form.isoformat() if st.session_state.mprev_prox_form else '',
-                            st.session_state.art_num_form, st.session_state.art_validade_form.isoformat() if st.session_state.art_validade_form else '', st.session_state.obs_form,
+                            st.session_state.mprev_data_form, st.session_state.mprev_prox_form,
+                            st.session_state.art_num_form, st.session_state.art_validade_form, st.session_state.obs_form,
                             get_url('art_doc'), get_url('nr11_doc'), get_url('cnh_doc'), get_url('crlv'), get_url('mprev_doc'), get_url('grafico_doc')
                         ]
                         
