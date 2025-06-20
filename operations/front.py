@@ -287,12 +287,10 @@ def front_page():
     ]
     for campo in campos:
         if campo not in st.session_state:
-            # Inicializa datas e anos como None, o resto como string vazia
             if "validade" in campo or "data" in campo or "ano" in campo:
                 st.session_state[campo] = None
             else:
                 st.session_state[campo] = ""
-
 
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
