@@ -12,6 +12,7 @@ GDRIVE_SHEETS_ID = "1nH_iF223sNXqbfItbvLZrnIadgJf7Q00M4prjFgGq7c"
 # Nome das abas na planilha
 LIFTING_SHEET_NAME = "Dados_Icamento"
 CRANE_SHEET_NAME = "Info_Guindauto"
+ADMIN_SHEET_NAME = "adm"
 
 def get_credentials_dict():
     """Retorna as credenciais do serviço do Google, seja do arquivo local ou do Streamlit Cloud."""
