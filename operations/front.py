@@ -226,7 +226,7 @@ def front_page():
 
                         try:
                             uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row); uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
-                            st.success(f"✅ Operação registrada com ID: {id_avaliacao}"); st.balloons()
+                            st.success(f"✅ Operação registrada com ID: {id_avaliacao}")
                             keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                             for key in keys_to_clear: del st.session_state[key]
                             time.sleep(3); st.rerun()
