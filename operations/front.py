@@ -1,3 +1,5 @@
+# FILE: front.py
+
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -6,6 +8,8 @@ import uuid
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import time
+
+# Funções e classes do projeto
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
@@ -76,7 +80,6 @@ def front_page():
     ]
     for key in form_keys:
         if key not in st.session_state:
-            # Garante que campos de data sejam inicializados com None, e não com ""
             if any(s in key for s in ['date', 'validade', 'prox']):
                 st.session_state[key] = None
             elif key == 'ano_form':
@@ -96,7 +99,6 @@ def front_page():
             estado_equipamento = st.radio("Estado do Equipamento", ["Novo", "Usado"], key="estado_equip_radio", help="Novo: 10% de margem. Usado: 25%.")
         if estado_equipamento == "Novo": st.info("Margem de segurança aplicada: 10%")
         else: st.warning("Margem de segurança aplicada: 25%")
-        
         with st.form("formulario_carga"):
             col1, col2 = st.columns(2);
             with col1:
@@ -219,14 +221,12 @@ def front_page():
                 else:
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
                         id_avaliacao = st.session_state.id_avaliacao; uploads = {}
-                        # Faz o upload dos arquivos que foram selecionados pelo usuário
                         if crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, crlv_file, 'crlv', id_avaliacao)
                         if art_file: uploads['art_doc'] = handle_upload_with_id(uploader, art_file, 'art_doc', id_avaliacao)
                         if nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, nr11_file, 'nr11_doc', id_avaliacao)
                         if mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, mprev_file, 'mprev_doc', id_avaliacao)
                         if cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, cnh_doc_file, 'cnh_doc', id_avaliacao)
                         if grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, grafico_carga_file, 'grafico_doc', id_avaliacao)
-                        
                         get_url = lambda key: uploads.get(key, {}).get('url', '') if uploads.get(key) else ''
                         
                         dados_guindauto_row = [
