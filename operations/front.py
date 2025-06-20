@@ -1,4 +1,3 @@
-
 import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
@@ -7,8 +6,6 @@ import uuid
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import time
-
-# Funções e classes do projeto
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
@@ -79,9 +76,13 @@ def front_page():
     ]
     for key in form_keys:
         if key not in st.session_state:
-            if any(s in key for s in ['date', 'validade', 'prox']): st.session_state[key] = None
-            elif key == 'ano_form': st.session_state[key] = date.today().year
-            else: st.session_state[key] = ""
+            # Garante que campos de data sejam inicializados com None, e não com ""
+            if any(s in key for s in ['date', 'validade', 'prox']):
+                st.session_state[key] = None
+            elif key == 'ano_form':
+                st.session_state[key] = date.today().year
+            else:
+                st.session_state[key] = ""
 
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
@@ -90,12 +91,12 @@ def front_page():
 
     # --- ABA 1: DADOS DO IÇAMENTO E CÁLCULO ---
     with tab1:
-        # Código da Aba 1 permanece inalterado
         col1_estado, col2_estado = st.columns(2)
         with col1_estado:
             estado_equipamento = st.radio("Estado do Equipamento", ["Novo", "Usado"], key="estado_equip_radio", help="Novo: 10% de margem. Usado: 25%.")
         if estado_equipamento == "Novo": st.info("Margem de segurança aplicada: 10%")
         else: st.warning("Margem de segurança aplicada: 25%")
+        
         with st.form("formulario_carga"):
             col1, col2 = st.columns(2);
             with col1:
@@ -150,8 +151,10 @@ def front_page():
         if cnh_doc_file and st.button("2. Extrair Dados da CNH com IA", key="extract_cnh_button"):
             extracted = ai_processor.extract_structured_data(cnh_doc_file, get_cnh_prompt())
             if extracted:
-                st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form); st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form);
-                st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form); st.session_state.cnh_validade_form = parse_date_string(extracted.get('validade')); 
+                st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
+                st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
+                st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form)
+                st.session_state.cnh_validade_form = parse_date_string(extracted.get('validade'))
                 st.rerun()
         col_op1, col_op2 = st.columns(2)
         with col_op1:
@@ -169,9 +172,11 @@ def front_page():
                 st.rerun()
         col_e1, col_e2 = st.columns(2)
         with col_e1:
-            st.session_state.placa_form = st.text_input("Placa Guindaste", value=st.session_state.placa_form); st.session_state.modelo_form = st.text_input("Modelo Equipamento", value=st.session_state.modelo_form)
+            st.session_state.placa_form = st.text_input("Placa Guindaste", value=st.session_state.placa_form)
+            st.session_state.modelo_form = st.text_input("Modelo Equipamento", value=st.session_state.modelo_form)
         with col_e2:
-            st.session_state.fabricante_form = st.text_input("Fabricante Equipamento", value=st.session_state.fabricante_form); st.session_state.ano_form = st.number_input("Ano Fabricação", min_value=1950, max_value=date.today().year + 1, value=st.session_state.ano_form)
+            st.session_state.fabricante_form = st.text_input("Fabricante Equipamento", value=st.session_state.fabricante_form)
+            st.session_state.ano_form = st.number_input("Ano Fabricação", min_value=1950, max_value=date.today().year + 1, value=st.session_state.ano_form)
 
         st.subheader("📄 Documentação e Validades"); col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
@@ -179,13 +184,14 @@ def front_page():
             if art_file and st.button("🔍 Extrair Dados da ART", key="extract_art_button"):
                  extracted = ai_processor.extract_structured_data(art_file, get_art_prompt()); 
                  if extracted: st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form); st.session_state.art_validade_form = parse_date_string(extracted.get('data_emissao')); st.rerun()
-            st.session_state.art_num_form = st.text_input("Número ART", value=st.session_state.art_num_form); st.session_state.art_validade_form = st.date_input("Validade ART", value=st.session_state.art_validade_form)
+            st.session_state.art_num_form = st.text_input("Número ART", value=st.session_state.art_num_form)
+            st.session_state.art_validade_form = st.date_input("Validade ART", value=st.session_state.art_validade_form)
         with col_d2:
             st.markdown("**Certificado NR-11**"); nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_uploader")
             if nr11_file and st.button("🔍 Extrair Dados do NR-11", key="extract_nr11_button"):
                 extracted = ai_processor.extract_structured_data(nr11_file, get_nr11_prompt())
                 if extracted:
-                    st.session_state.nr11_num_form = extracted.get('numero_nr11', st.session_state.nr11_num_form); st.session_state.nr11_data_form = parse_date_string(extracted.get('data_emissao')); st.session_state.nr11_validade_form = parse_date_string(extracted.get('validade')); st.rerun()
+                    st.session_state.operador_form = extracted.get('nome_operador', st.session_state.operador_form); st.session_state.nr11_num_form = extracted.get('numero_nr11', st.session_state.nr11_num_form); st.session_state.nr11_data_form = parse_date_string(extracted.get('data_emissao')); st.session_state.nr11_validade_form = parse_date_string(extracted.get('validade')); st.rerun()
             st.session_state.nr11_num_form = st.text_input("Número NR-11", value=st.session_state.nr11_num_form)
             st.session_state.nr11_data_form = st.date_input("Emissão NR-11", value=st.session_state.nr11_data_form)
             validade_nr11 = st.session_state.nr11_validade_form if st.session_state.nr11_validade_form else (st.session_state.nr11_data_form + relativedelta(years=1) if st.session_state.nr11_data_form else None)
@@ -213,12 +219,14 @@ def front_page():
                 else:
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
                         id_avaliacao = st.session_state.id_avaliacao; uploads = {}
+                        # Faz o upload dos arquivos que foram selecionados pelo usuário
                         if crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, crlv_file, 'crlv', id_avaliacao)
                         if art_file: uploads['art_doc'] = handle_upload_with_id(uploader, art_file, 'art_doc', id_avaliacao)
                         if nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, nr11_file, 'nr11_doc', id_avaliacao)
                         if mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, mprev_file, 'mprev_doc', id_avaliacao)
                         if cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, cnh_doc_file, 'cnh_doc', id_avaliacao)
                         if grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, grafico_carga_file, 'grafico_doc', id_avaliacao)
+                        
                         get_url = lambda key: uploads.get(key, {}).get('url', '') if uploads.get(key) else ''
                         
                         dados_guindauto_row = [
