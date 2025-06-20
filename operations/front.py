@@ -5,8 +5,6 @@ import numpy as np
 import uuid
 from datetime import datetime, date
 import time
-
-# Funções e classes do projeto
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
@@ -14,7 +12,6 @@ from AI.api_Operation import PDFQA
 from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_nr11_prompt, get_mprev_prompt
 import logging
 
-# Configuração do logging
 logging.basicConfig(level=logging.INFO)
 
 # --------------------- Funções Utilitárias --------------------
@@ -28,7 +25,7 @@ def mostrar_instrucoes():
             - **Dados do Operador**: Faça o upload da CNH e clique em "Extrair Dados" para preencher as informações do operador.
             - **Dados do Equipamento**: Faça o upload do CRLV para preencher os dados do veículo.
             - **Preenchimento Manual**: Preencha ou corrija os demais campos necessários.
-            - **Documentos**: Faça o upload de todos os outros documentos solicitados. A IA irá validar os documentos.
+            - **Documentos**: Faça o upload de todos os outros documentos solicitados.
         3. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
         """)
 
@@ -76,14 +73,16 @@ def front_page():
         'operador_form', 'cpf_form', 'cnh_form', 'cnh_validade_form', 'cnh_status', 
         'placa_form', 'modelo_form', 'fabricante_form', 'ano_form', 
         'art_num_form', 'art_validade_form', 'art_status', 'obs_form', 
-        'nr11_modulo_form', 'nr11_validade_form', 'nr11_status', # Alterado aqui
+        'nr11_modulo_form', 'nr11_validade_form', 'nr11_status',
         'mprev_data_form', 'mprev_prox_form', 'mprev_status'
     ]
     for key in form_keys:
         if key not in st.session_state: st.session_state[key] = ""
     
     if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
-
+    if 'dados_icamento' not in st.session_state: st.session_state.dados_icamento = {}
+    if 'uploads' not in st.session_state: st.session_state.uploads = {}
+    
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
     
@@ -120,7 +119,7 @@ def front_page():
                     st.session_state.dados_icamento['validacao'] = validacao
                     st.success("Cálculo realizado. Verifique os resultados abaixo.")
                 except Exception as e: st.error(f"Erro no cálculo: {e}")
-        if 'dados_icamento' in st.session_state:
+        if st.session_state.dados_icamento:
             res = st.session_state.dados_icamento; val = res.get('validacao', {})
             st.subheader("📊 Resultados do Cálculo"); st.table(pd.DataFrame({'Descrição': ['Peso da carga', 'Margem (%)', 'Peso Segurança', 'Peso a Considerar', 'Peso Cabos (3%)', 'Peso Acessórios', 'CARGA TOTAL'], 'Valor (kg)': [f"{res.get(k, 0):.2f}" for k in ['peso_carga', 'margem_seguranca_percentual', 'peso_seguranca', 'peso_considerar', 'peso_cabos', 'peso_acessorios']] + [f"**{res.get('carga_total', 0):.2f}**"]}))
             st.subheader("🎯 Resultado da Validação"); 
@@ -145,8 +144,11 @@ def front_page():
         if cnh_doc_file and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
             extracted = ai_processor.extract_structured_data(cnh_doc_file, get_cnh_prompt())
             if extracted:
-                st.session_state.operador_form = extracted.get('nome', ''); st.session_state.cpf_form = extracted.get('cpf', ''); st.session_state.cnh_form = extracted.get('numero_cnh', ''); st.session_state.cnh_validade_form = extracted.get('validade_cnh', ''); st.session_state.cnh_status = extracted.get('status', 'Falha na verificação');
-                st.rerun()
+                st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
+                st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
+                st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form)
+                st.session_state.cnh_validade_form = extracted.get('validade_cnh', st.session_state.cnh_validade_form)
+                st.session_state.cnh_status = extracted.get('status', 'Falha na verificação')
         col_op1, col_op2 = st.columns(2)
         with col_op1: st.text_input("Nome", key="operador_form", disabled=True); st.text_input("CPF", key="cpf_form", disabled=True)
         with col_op2: st.text_input("Nº da CNH", key="cnh_form", disabled=True); st.text_input("Validade CNH", key="cnh_validade_form", disabled=True)
@@ -155,7 +157,10 @@ def front_page():
         st.subheader("🏗️ Dados do Equipamento"); crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_uploader")
         if crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
             extracted = ai_processor.extract_structured_data(crlv_file, get_crlv_prompt())
-            if extracted: st.session_state.placa_form = extracted.get('placa', ''); st.session_state.ano_form = extracted.get('ano_fabricacao', ''); st.session_state.modelo_form = extracted.get('marca_modelo', ''); st.rerun()
+            if extracted: 
+                st.session_state.placa_form = extracted.get('placa', st.session_state.placa_form)
+                st.session_state.ano_form = extracted.get('ano_fabricacao', st.session_state.ano_form)
+                st.session_state.modelo_form = extracted.get('marca_modelo', st.session_state.modelo_form)
         col_e1, col_e2 = st.columns(2)
         with col_e1: st.text_input("Placa", key="placa_form"); st.text_input("Modelo", key="modelo_form")
         with col_e2: st.text_input("Fabricante", key="fabricante_form"); st.text_input("Ano", key="ano_form")
@@ -164,33 +169,32 @@ def front_page():
         with col_d1:
             st.markdown("**ART**"); art_file = st.file_uploader("Doc. ART (.pdf)", key="art_uploader")
             if art_file and st.button("Verificar ART", key="art_button"):
-                 extracted = ai_processor.extract_structured_data(art_file, get_art_prompt()); 
-                 if extracted: st.session_state.art_num_form = extracted.get('numero_art', ''); st.session_state.art_validade_form = extracted.get('validade_art', ''); st.session_state.art_status = extracted.get('status', 'Falha na verificação'); st.rerun()
+                 extracted = ai_processor.extract_structured_data(art_file, get_art_prompt())
+                 if extracted: 
+                    st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form)
+                    st.session_state.art_validade_form = extracted.get('validade_art', st.session_state.art_validade_form)
+                    st.session_state.art_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Nº ART", key="art_num_form"); st.text_input("Validade ART", key="art_validade_form", disabled=True); display_status(st.session_state.art_status)
-        
         with col_d2:
             st.markdown("**Certificado NR-11**"); nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_uploader")
             if nr11_file and st.button("Verificar NR-11", key="nr11_button"):
                 extracted = ai_processor.extract_structured_data(nr11_file, get_nr11_prompt())
                 if extracted:
-                    st.session_state.nr11_modulo_form = extracted.get('modulo', 'Não identificado')
-                    st.session_state.nr11_validade_form = extracted.get('validade_nr11', '')
+                    st.session_state.nr11_modulo_form = extracted.get('modulo', st.session_state.nr11_modulo_form)
+                    st.session_state.nr11_validade_form = extracted.get('validade_nr11', st.session_state.nr11_validade_form)
                     st.session_state.nr11_status = extracted.get('status', 'Falha na verificação')
-                    st.rerun()
-            
             modulos_nr11 = ["", "Guindauto", "Guindaste", "Munck"]
-            if st.session_state.nr11_modulo_form and st.session_state.nr11_modulo_form not in modulos_nr11:
-                modulos_nr11.append(st.session_state.nr11_modulo_form)
-            
+            if st.session_state.nr11_modulo_form and st.session_state.nr11_modulo_form not in modulos_nr11: modulos_nr11.append(st.session_state.nr11_modulo_form)
             st.selectbox("Módulo NR-11", options=modulos_nr11, key="nr11_modulo_form")
-            st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True)
-            display_status(st.session_state.nr11_status)
-            
+            st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True); display_status(st.session_state.nr11_status)
         with col_d3:
             st.markdown("**Manutenção (M_PREV)**"); mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_uploader")
             if mprev_file and st.button("Verificar Manutenção", key="mprev_button"):
                 extracted = ai_processor.extract_structured_data(mprev_file, get_mprev_prompt())
-                if extracted: st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', ''); st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', ''); st.session_state.mprev_status = extracted.get('status', 'Falha na verificação'); st.rerun()
+                if extracted: 
+                    st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', st.session_state.mprev_data_form)
+                    st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', st.session_state.mprev_prox_form)
+                    st.session_state.mprev_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Última Manutenção", key="mprev_data_form", disabled=True); st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True); display_status(st.session_state.mprev_status)
         
         st.subheader("Upload de Gráfico de Carga"); grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_uploader", label_visibility="collapsed")
@@ -200,7 +204,7 @@ def front_page():
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button("💾 Salvar Todas as Informações", type="primary", use_container_width=True):
-                if 'dados_icamento' not in st.session_state: st.error("Calcule os dados de içamento na Aba 1 primeiro.")
+                if not st.session_state.dados_icamento: st.error("Calcule os dados de içamento na Aba 1 primeiro.")
                 else:
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
                         id_avaliacao = st.session_state.id_avaliacao; uploads = {}
@@ -229,7 +233,7 @@ def front_page():
                             st.success(f"✅ Operação registrada com ID: {id_avaliacao}")
                             keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                             for key in keys_to_clear: del st.session_state[key]
-                            time.sleep(3); st.rerun()
+                            time.sleep(2); st.rerun()
                         except Exception as e: st.error(f"Erro ao salvar nos registros: {e}")
         with col_s2:
             if st.button("🔄 Limpar Formulário", use_container_width=True):
