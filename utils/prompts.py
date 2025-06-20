@@ -1,4 +1,3 @@
-# FILE: utils/prompts.py
 from datetime import date
 
 def get_crlv_prompt():
