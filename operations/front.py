@@ -90,7 +90,7 @@ def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio
         mode='lines', name='Torre', line=dict(color='dimgray', width=8), hoverinfo='none'
     ))
 
-  -
+  
     cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
     fig.add_trace(go.Scatter(
         x=[0, raio_max], y=[2, alcance_max + 2], 
