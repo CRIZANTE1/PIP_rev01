@@ -278,20 +278,21 @@ def handle_upload_with_id(uploader, arquivo, tipo_doc, id_avaliacao):
 
 
 def front_page():
-    # Inicialização completa do session_state para todos os campos
-    form_keys = [
-        'empresa_responsavel_form', 'cnpj_form', 'telefone_form', 'email_form',
-        'nome_operador_form', 'cpf_operador_form', 'cnh_form', 'validade_cnh_form',
-        'placa_equip_form', 'modelo_equip_form', 'fabricante_equip_form', 'ano_equip_form',
-        'ultima_manutencao_form', 'proxima_manutencao_form',
-        'num_art_form', 'validade_art_form', 'observacoes_form',
-        'nr11_data_emissao_form', 'mprev_data_emissao_form'
+    campos = [
+        "empresa_form", "cnpj_form", "telefone_form", "email_form",
+        "operador_form", "cpf_form", "cnh_form", "cnh_validade_form",
+        "placa_form", "modelo_form", "fabricante_form", "ano_form",
+        "mprev_data_form", "mprev_prox_form", "art_num_form", "art_validade_form",
+        "nr11_num_form", "nr11_data_form", "nr11_validade_form", "obs_form"
     ]
-    for key in form_keys:
-        if key not in st.session_state:
-            if key == 'ano_equip_form': st.session_state[key] = datetime.now().year
-            elif 'date' in key or 'manutencao' in key: st.session_state[key] = None
-            else: st.session_state[key] = ""
+    for campo in campos:
+        if campo not in st.session_state:
+            # Inicializa datas e anos como None, o resto como string vazia
+            if "validade" in campo or "data" in campo or "ano" in campo:
+                st.session_state[campo] = None
+            else:
+                st.session_state[campo] = ""
+
 
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
