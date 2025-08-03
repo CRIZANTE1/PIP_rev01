@@ -1,4 +1,4 @@
-# Calculadora de Movimentação de Carga (PIP_rev0)
+# Calculadora de Movimentação de Carga (PIP_rev1)
 
 ## 📋 Descrição
 Uma aplicação web desenvolvida com Streamlit para auxiliar no cálculo e validação de operações de içamento com guindastes e guindautos. O sistema incorpora cálculos de segurança, validações técnicas e gerenciamento de documentação, tornando o processo mais seguro e eficiente.
