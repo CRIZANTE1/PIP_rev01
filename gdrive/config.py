@@ -15,7 +15,7 @@ try:
     LIFTING_SHEET_NAME = st.secrets.gdrive_config.lifting_sheet_name
     CRANE_SHEET_NAME = st.secrets.gdrive_config.crane_sheet_name
     ADMIN_SHEET_NAME = st.secrets.gdrive_config.admin_sheet_name
-    RAG_SHEET_NAME = "st.secrets.rag_config.sheet_name"
+    RAG_SHEET_NAME = st.secrets.rag_config.sheet_name
     
 except (AttributeError, KeyError):
     st.error(
@@ -61,5 +61,6 @@ def get_credentials_dict():
         except Exception as e:
             st.error(f"Erro ao carregar credenciais do arquivo local: {str(e)}")
             raise e
+
 
 
