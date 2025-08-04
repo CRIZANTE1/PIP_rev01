@@ -3,146 +3,112 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import streamlit as st
-from gdrive.config import get_credentials_dict, GDRIVE_FOLDER_ID, GDRIVE_SHEETS_ID, LIFTING_SHEET_NAME, CRANE_SHEET_NAME
-import tempfile # Importar o módulo tempfile
+from gdrive.config import get_credentials_dict, GDRIVE_FOLDER_ID, GDRIVE_SHEETS_ID
+import tempfile
+import gspread # <-- MUDANÇA: Importar a biblioteca gspread
 
 class GoogleDriveUploader:
     def __init__(self):
         self.SCOPES = [
             'https://www.googleapis.com/auth/drive.file',
-            'https://www.googleapis.com/auth/spreadsheets' # Adicionado escopo para Google Sheets
+            'https://www.googleapis.com/auth/spreadsheets'
         ]
         self.credentials = None
         self.drive_service = None
-        self.sheets_service = None
+        self.sheets_service = None # <-- MUDANÇA: Isto agora será o cliente gspread
         self.initialize_services()
 
     def initialize_services(self):
-        """Inicializa os serviços do Google Drive e Google Sheets"""
+        """Inicializa os serviços do Google Drive e Google Sheets (usando gspread)"""
         try:
             credentials_dict = get_credentials_dict()
             self.credentials = service_account.Credentials.from_service_account_info(
                 credentials_dict,
                 scopes=self.SCOPES
             )
+            # O serviço do Drive continua o mesmo
             self.drive_service = build('drive', 'v3', credentials=self.credentials)
-            self.sheets_service = build('sheets', 'v4', credentials=self.credentials)
+            
+            # MUDANÇA: Inicializa o gspread em vez da API do Sheets
+            self.sheets_service = gspread.authorize(self.credentials)
+            
         except Exception as e:
             st.error(f"Erro ao inicializar serviços do Google: {str(e)}")
             raise
 
-    def upload_file(self, arquivo, novo_nome=None): # Adicionado novo_nome como parâmetro
+    def upload_file(self, arquivo, novo_nome=None):
         """
-        Faz upload do arquivo para o Google Drive
-        
-        Args:
-            arquivo: StreamlitUploadedFile object
-            novo_nome (str, optional): Nome a ser dado ao arquivo no Drive. Se None, usa o nome original.
-        
-        Returns:
-            str: URL de visualização do arquivo
+        Faz upload do arquivo para o Google Drive.
+        ESTA FUNÇÃO NÃO PRECISA DE MUDANÇAS.
         """
-        st.info("Iniciando processo de upload do arquivo.") # Log adicionado
-        temp_file = None # Inicializa temp_file como None
+        st.info("Iniciando processo de upload do arquivo.")
+        temp_file = None
         try:
-            st.info("Criando arquivo temporário.") # Log adicionado
-            # Criar arquivo temporário usando tempfile
-            # delete=False para que o arquivo não seja excluído automaticamente ao fechar
-            # e possamos passá-lo para MediaFileUpload
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(arquivo.name)[1])
             temp_file.write(arquivo.getbuffer())
-            temp_file.close() # Fechar o arquivo para liberar o handle
-
-            temp_path = temp_file.name # Obter o caminho do arquivo temporário
-            st.info(f"Arquivo temporário criado em: {temp_path}") # Log adicionado
-
-            # Preparar metadata
-            st.info("Preparando metadados do arquivo.") # Log adicionado
+            temp_file.close()
+            temp_path = temp_file.name
+            
             file_metadata = {
-                'name': novo_nome if novo_nome else arquivo.name, # Usa novo_nome se fornecido
+                'name': novo_nome if novo_nome else arquivo.name,
                 'parents': [GDRIVE_FOLDER_ID]
             }
-            st.info(f"Metadados: {file_metadata}") # Log adicionado
-
-            # Preparar upload
-            st.info("Preparando upload de mídia.") # Log adicionado
-            media = MediaFileUpload(
-                temp_path,
-                mimetype=arquivo.type,
-                resumable=True
-            )
-            st.info(f"Tipo MIME do arquivo: {arquivo.type}") # Log adicionado
-
-            # Fazer upload
-            st.info("Executando upload para o Google Drive.") # Log adicionado
-            file = self.drive_service.files().create( # Usar self.drive_service
+            media = MediaFileUpload(temp_path, mimetype=arquivo.type, resumable=True)
+            
+            file = self.drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id,webViewLink'
             ).execute()
-            st.info("Upload concluído com sucesso.") # Log adicionado
-
+            
             return file.get('webViewLink')
-
         except Exception as e:
             if "HttpError 404" in str(e) and GDRIVE_FOLDER_ID in str(e):
-                st.error(f"Erro: A pasta do Google Drive com ID '{GDRIVE_FOLDER_ID}' não foi encontrada ou as permissões estão incorretas. Por favor, verifique se o ID da pasta está correto em 'gdrive/config.py' e se a conta de serviço tem permissão de 'Editor' ou 'Colaborador' para esta pasta.")
+                st.error(f"Erro: A pasta do Google Drive com ID '{GDRIVE_FOLDER_ID}' não foi encontrada. Verifique as permissões.")
             else:
                 st.error(f"Erro ao fazer upload do arquivo: {str(e)}")
             raise
-        finally: # Garante que o arquivo temporário seja removido
+        finally:
             if temp_file and os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except Exception as e_remove:
-                    st.error(f"Erro ao remover arquivo temporário '{temp_path}': {str(e_remove)}")
+                os.remove(temp_path)
 
     def append_data_to_sheet(self, sheet_name, data_row):
         """
-        Adiciona uma nova linha de dados à planilha do Google Sheets.
-        
-        Args:
-            sheet_name (str): Nome da aba na planilha (ex: 'Dados_Icamento', 'Info_Guindauto').
-            data_row (list): Uma lista de valores a serem adicionados como uma nova linha.
-        
-        Returns:
-            dict: Resposta da API do Google Sheets.
+        MUDANÇA: Adiciona uma nova linha de dados à planilha usando gspread.
         """
         try:
-            range_name = f"{sheet_name}!A:Z" # Define o range para adicionar a linha
-            body = {
-                'values': [data_row]
-            }
-            result = self.sheets_service.spreadsheets().values().append( # Usar self.sheets_service
-                spreadsheetId=GDRIVE_SHEETS_ID,
-                range=range_name,
-                valueInputOption='RAW',
-                insertDataOption='INSERT_ROWS',
-                body=body
-            ).execute()
+            # Abre a planilha pelo ID e seleciona a aba pelo nome
+            spreadsheet = self.sheets_service.open_by_key(GDRIVE_SHEETS_ID)
+            worksheet = spreadsheet.worksheet(sheet_name)
+            
+            # Adiciona a linha no final da aba
+            # 'RAW' garante que os dados sejam inseridos como o usuário digitou
+            result = worksheet.append_row(data_row, value_input_option='RAW')
             return result
+            
+        except gspread.exceptions.WorksheetNotFound:
+            st.error(f"Erro: A aba com o nome '{sheet_name}' não foi encontrada na sua planilha. Verifique o nome no arquivo secrets.toml.")
+            raise
         except Exception as e:
-            st.error(f"Erro ao adicionar dados à planilha '{sheet_name}': {str(e)}")
+            st.error(f"Erro ao adicionar dados à planilha '{sheet_name}' com gspread: {str(e)}")
             raise
 
     def get_data_from_sheet(self, sheet_name):
         """
-        Lê todos os dados de uma aba específica da planilha do Google Sheets.
-        
-        Args:
-            sheet_name (str): Nome da aba na planilha.
-        
-        Returns:
-            list: Uma lista de listas, representando as linhas e colunas da planilha.
+        MUDANÇA: Lê todos os dados de uma aba específica usando gspread.
         """
         try:
-            range_name = f"{sheet_name}!A:Z" # Lê todas as colunas
-            result = self.sheets_service.spreadsheets().values().get(
-                spreadsheetId=GDRIVE_SHEETS_ID,
-                range=range_name
-            ).execute()
-            values = result.get('values', [])
+            # Abre a planilha pelo ID e seleciona a aba pelo nome
+            spreadsheet = self.sheets_service.open_by_key(GDRIVE_SHEETS_ID)
+            worksheet = spreadsheet.worksheet(sheet_name)
+            
+            # Pega todos os valores da planilha
+            values = worksheet.get_all_values()
             return values
+            
+        except gspread.exceptions.WorksheetNotFound:
+            st.error(f"Erro: A aba com o nome '{sheet_name}' não foi encontrada na sua planilha. Verifique o nome no arquivo secrets.toml.")
+            return None # Retorna None para indicar o erro
         except Exception as e:
-            st.error(f"Erro ao ler dados da planilha '{sheet_name}': {str(e)}")
+            st.error(f"Erro ao ler dados da planilha '{sheet_name}' com gspread: {str(e)}")
             raise
