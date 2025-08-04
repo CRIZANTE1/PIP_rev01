@@ -3,8 +3,8 @@ import pandas as pd
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from operations.plot import criar_diagrama_guindaste
-from AI.api_Operation import PDFQA  # <-- CORREÇÃO: Importar a classe da IA
-from utils.prompts import get_cnh_prompt, get_art_prompt, get_nr11_prompt, get_mprev_prompt # <-- CORREÇÃO: Importar os prompts
+from AI.api_Operation import PDFQA 
+from utils.prompts import get_cnh_prompt, get_art_prompt, get_nr11_prompt, get_mprev_prompt 
 
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
@@ -159,6 +159,7 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
 
