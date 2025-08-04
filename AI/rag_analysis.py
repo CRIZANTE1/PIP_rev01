@@ -5,8 +5,8 @@ import google.generativeai as genai
 
 from AI.api_load import load_api
 from gdrive.gdrive_upload import GoogleDriveUploader
+from gdrive.config import RAG_SHEET_NAME
 
-RAG_SHEET_NAME = "RAG_PIP"
 EMBEDDING_MODEL = 'text-embedding-004'
 
 class RAGAnalyzer:
