@@ -1,5 +1,3 @@
-# FILE: AI/api_Operation.py
-
 import google.generativeai as genai
 from google.generativeai.types import content_types
 from AI.api_load import load_api
@@ -134,6 +132,7 @@ class PDFQA:
 
 
    
+
 
 
 
