@@ -1,16 +1,13 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime, date
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from operations.plot import criar_diagrama_guindaste
-from AI.api_Operation import PDFQA 
-from utils.prompts import get_cnh_prompt, get_art_prompt, get_nr11_prompt, get_mprev_prompt 
 
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
-    """
-    Carrega dados de uma aba específica do Google Sheets e os converte em um DataFrame.
-    """
+    """Carrega dados de uma aba específica do Google Sheets."""
     try:
         uploader = GoogleDriveUploader()
         data = uploader.get_data_from_sheet(sheet_name)
@@ -24,56 +21,71 @@ def load_sheet_data(sheet_name):
         return pd.DataFrame()
 
 def make_urls_clickable(df):
-    """Transforma colunas que contêm URLs em links HTML clicáveis para a visão geral."""
+    """Transforma colunas de URL em links HTML."""
     for col in df.columns:
         if "URL" in col.upper() or "LINK" in col.upper():
             df[col] = df[col].apply(lambda x: f'<a href="{x}" target="_blank">Abrir Link</a>' if pd.notna(x) and str(x).startswith('http') else "N/A")
     return df
 
-@st.cache_data(ttl=900) # Cache para não reanalisar o mesmo doc repetidamente
-def analyze_document_live(doc_url, prompt_function):
-    # Esta função é um STUB. A lógica real de reanálise é complexa.
-    # Sem uma forma de obter os bytes do PDF a partir da URL do Google Drive.
-    # não podemos reenviar para a IA.
-    # A solução mais pragmática e que funciona é salvar o status no front.py.
-    pass # Deixando a função vazia por enquanto.
+def get_status_from_date(date_str):
+    """Calcula o status (Válido/Vencido) a partir de uma string de data."""
+    if not date_str or not isinstance(date_str, str):
+        return "Status Indeterminado"
+    
+    today = datetime.now().date()
+    try:
+        expiry_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        try:
+            expiry_date = datetime.strptime(date_str, '%d/%m/%Y').date()
+        except ValueError:
+            return "Data em formato inválido"
+
+    if expiry_date >= today:
+        return "Válido"
+    else:
+        return "Vencido"
 
 def render_document_status(dados_guindauto):
-    """
-    Renderiza a lista de documentos. Como não salvamos o status, apenas mostramos se o link existe.
-    """
+    """Renderiza a lista de documentos calculando o status em tempo real a partir das datas na planilha."""
     st.subheader("Documentos Avaliados")
 
+    # CORREÇÃO: Removida a verificação de data para a "Certificação NR-11"
     doc_map = {
-        "ART (Anot. Resp. Técnica)": "URL ART",
-        "Certificação NR-11": "URL Certificado",
-        "CNH do Operador": "URL CNH",
-        "CRLV do Veículo": "URL CRLV",
-        "Manutenção Preventiva": "URL M_PREV",
-        "Gráfico de Carga": "URL Gráfico de Carga"
+        "ART (Anot. Resp. Técnica)": {"url_col": "URL ART", "date_col": "Validade ART"},
+        "Certificação NR-11":        {"url_col": "URL Certificado", "date_col": None}, 
+        "CNH do Operador":           {"url_col": "URL CNH", "date_col": "Validade CNH"},
+        "Manutenção Preventiva":     {"url_col": "URL M_PREV", "date_col": "Próxima Manutenção"},
+        "CRLV do Veículo":           {"url_col": "URL CRLV", "date_col": None},
+        "Gráfico de Carga":          {"url_col": "URL Gráfico de Carga", "date_col": None}
     }
 
-    for doc_name, col_name in doc_map.items():
-        url = dados_guindauto.get(col_name)
-
+    for doc_name, cols in doc_map.items():
+        url = dados_guindauto.get(cols["url_col"])
+        
         if pd.notna(url) and str(url).strip().startswith('http'):
             link = f"<a href='{url}' target='_blank'>Abrir Documento</a>"
-            # Como não temos o status, mostramos sempre o check verde se o link existir.
-            st.markdown(f"✅ **{doc_name}**: {link}", unsafe_allow_html=True)
+            
+            if cols["date_col"]:
+                date_value = dados_guindauto.get(cols["date_col"])
+                status = get_status_from_date(date_value)
+                
+                if "Válido" in status:
+                    st.markdown(f"✅ **{doc_name}**: {status} - {link}", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"❌ **{doc_name}**: {status} - {link}", unsafe_allow_html=True)
+            else:
+                st.markdown(f"✅ **{doc_name}**: {link}", unsafe_allow_html=True)
         else:
             st.markdown(f"❌ **{doc_name}**: Documento não fornecido")
 
 def safe_to_numeric(series):
-    """
-    Converte uma série para numérico de forma segura, tratando vírgulas como decimais.
-    """
+    """Converte uma série para numérico de forma segura, tratando vírgulas."""
     if series is None: return None
     return pd.to_numeric(str(series).replace(',', '.'), errors='coerce')
 
 def render_diagrama(dados_icamento):
-    """
-    Adota um valor padrão de 40 graus para o ângulo mínimo se não for encontrado.
-    """
+    """Adota um valor padrão de 40 graus para o ângulo mínimo se não for encontrado."""
     st.subheader("Diagrama da Operação")
     try:
         raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
@@ -96,6 +108,7 @@ def render_diagrama(dados_icamento):
         st.error(f"Ocorreu um erro ao renderizar o diagrama: {e}")
 
 def show_history_page():
+    # O restante da função permanece inalterado.
     st.title("Histórico de Avaliações")
     st.info("Os dados são atualizados a cada 10 minutos. Para forçar a atualização, limpe o cache.")
     if st.button("Limpar Cache e Recarregar Dados"):
@@ -159,8 +172,5 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
-
-
-
 
 
