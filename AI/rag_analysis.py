@@ -124,7 +124,7 @@ class RAGAnalyzer:
         
         # O prompt permanece o mesmo, pois é robusto e genérico
         prompt = f"""
-        **Persona:** Você é um Engenheiro de Segurança do Trabalho altamente experiente, especialista em operações de içamento e rigging. Sua tarefa é analisar o relatório de uma operação de carga e fornecer um parecer técnico final, fundamentado nas normas internas da empresa.
+        **Persona:** Você é um Profissional de Segurança do Trabalho altamente experiente, especialista em operações de içamento e rigging. Sua tarefa é analisar o relatório de uma operação de carga e fornecer um parecer técnico final, fundamentado nas normas internas da empresa.
 
         **Instruções:**
         1.  Analise o "Resumo da Operação" fornecido.
@@ -133,7 +133,7 @@ class RAGAnalyzer:
         4.  O parecer deve conter obrigatoriamente as seguintes seções:
             -   `### 📝 Análise Geral da Operação`: Um breve resumo do que foi avaliado.
             -   `### ⚠️ Pontos de Atenção`: Liste os problemas encontrados (ex: excesso de capacidade, documentos vencidos, etc.).
-            -   `### 📚 Fundamentação Normativa`: Para cada ponto de atenção, cite a diretriz e a referência normativa correspondente do contexto que você recebeu.
+            -   `### 📚 Fundamentação Normativa`: Para cada ponto de atenção, cite a referência normativa correspondente do contexto que você recebeu.
             -   `### ✅ Recomendações Corretivas`: Forneça ações claras e diretas para cada ponto de atenção, baseadas nas diretrizes.
             -   `### ⚖️ Parecer Final`: Conclua com um dos seguintes pareceres: **"APROVADO"**, **"APROVADO COM RESSALVAS"**, ou **"REPROVADO"**. Justifique sua decisão com base na gravidade dos pontos de atenção e suas respectivas fundamentações normativas.
 
