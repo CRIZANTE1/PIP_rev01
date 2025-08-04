@@ -15,7 +15,8 @@ try:
     LIFTING_SHEET_NAME = st.secrets.gdrive_config.lifting_sheet_name
     CRANE_SHEET_NAME = st.secrets.gdrive_config.crane_sheet_name
     ADMIN_SHEET_NAME = st.secrets.gdrive_config.admin_sheet_name
-
+    RAG_SHEET_NAME = "st.secrets.rag_config.sheet_name"
+    
 except (AttributeError, KeyError):
     st.error(
         "Erro de configuração: As chaves do Google Drive não foram encontradas nos secrets. "
@@ -28,6 +29,7 @@ except (AttributeError, KeyError):
     LIFTING_SHEET_NAME = ""
     CRANE_SHEET_NAME = ""
     ADMIN_SHEET_NAME = ""
+    RAG_SHEET_NAME = ""
 
 def get_credentials_dict():
     """Retorna as credenciais do serviço do Google, seja do arquivo local ou do Streamlit Cloud."""
@@ -59,4 +61,5 @@ def get_credentials_dict():
         except Exception as e:
             st.error(f"Erro ao carregar credenciais do arquivo local: {str(e)}")
             raise e
+
 
