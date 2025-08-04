@@ -5,7 +5,7 @@ from googleapiclient.http import MediaFileUpload
 import streamlit as st
 from gdrive.config import get_credentials_dict, GDRIVE_FOLDER_ID, GDRIVE_SHEETS_ID
 import tempfile
-import gspread # <-- MUDANÇA: Importar a biblioteca gspread
+import gspread
 
 class GoogleDriveUploader:
     def __init__(self):
@@ -15,7 +15,7 @@ class GoogleDriveUploader:
         ]
         self.credentials = None
         self.drive_service = None
-        self.sheets_service = None # <-- MUDANÇA: Isto agora será o cliente gspread
+        self.sheets_service = None 
         self.initialize_services()
 
     def initialize_services(self):
