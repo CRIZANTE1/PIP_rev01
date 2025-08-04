@@ -2,17 +2,32 @@ import os
 import json
 import streamlit as st
 
-# ID da pasta no Google Drive onde os arquivos serão salvos
-GDRIVE_FOLDER_ID = "1eCuybshDxOjOmJ7aYDnClatc4Ow_4zRL"
-
-# ID da planilha compartilhada para dados de içamento e guindauto
-GDRIVE_SHEETS_ID = "1nH_iF223sNXqbfItbvLZrnIadgJf7Q00M4prjFgGq7c"
 
 
-# Nome das abas na planilha
-LIFTING_SHEET_NAME = "Dados_Icamento"
-CRANE_SHEET_NAME = "Info_Guindauto"
-ADMIN_SHEET_NAME = "adm"
+try:
+    # ID da pasta no Google Drive onde os arquivos serão salvos
+    GDRIVE_FOLDER_ID = st.secrets.gdrive_config.folder_id
+
+    # ID da planilha compartilhada para dados de içamento e guindauto
+    GDRIVE_SHEETS_ID = st.secrets.gdrive_config.sheets_id
+
+    # Nome das abas na planilha
+    LIFTING_SHEET_NAME = st.secrets.gdrive_config.lifting_sheet_name
+    CRANE_SHEET_NAME = st.secrets.gdrive_config.crane_sheet_name
+    ADMIN_SHEET_NAME = st.secrets.gdrive_config.admin_sheet_name
+
+except (AttributeError, KeyError):
+    st.error(
+        "Erro de configuração: As chaves do Google Drive não foram encontradas nos secrets. "
+        "Por favor, certifique-se de que a seção `[gdrive_config]` está corretamente configurada "
+        "em seu arquivo .streamlit/secrets.toml."
+    )
+    # Define valores padrão para evitar que o app quebre completamente na inicialização
+    GDRIVE_FOLDER_ID = ""
+    GDRIVE_SHEETS_ID = ""
+    LIFTING_SHEET_NAME = ""
+    CRANE_SHEET_NAME = ""
+    ADMIN_SHEET_NAME = ""
 
 def get_credentials_dict():
     """Retorna as credenciais do serviço do Google, seja do arquivo local ou do Streamlit Cloud."""
@@ -44,3 +59,4 @@ def get_credentials_dict():
         except Exception as e:
             st.error(f"Erro ao carregar credenciais do arquivo local: {str(e)}")
             raise e
+
