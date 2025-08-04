@@ -155,9 +155,9 @@ def front_page():
         with col_c2: st.text_input("Telefone", key="telefone_form"); st.text_input("Email", key="email_form")
 
         st.subheader("👤 Dados do Operador"); 
-        cnh_doc_file = st.file_uploader("1. Upload da CNH (.pdf, .png)", key="cnh_uploader")
-        if cnh_doc_file and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
-            extracted = ai_processor.extract_structured_data(cnh_doc_file, get_cnh_prompt())
+        cnh_doc_file = st.file_uploader("1. Upload da CNH (.pdf, .png)", key="cnh_doc_file")
+        if st.session_state.cnh_doc_file and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
+            extracted = ai_processor.extract_structured_data(st.session_state.cnh_doc_file, get_cnh_prompt())
             if extracted:
                 st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
                 st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
@@ -169,9 +169,11 @@ def front_page():
         with col_op2: st.text_input("Nº da CNH", key="cnh_form", disabled=True); st.text_input("Validade CNH", key="cnh_validade_form", disabled=True)
         display_status(st.session_state.cnh_status)
 
-        st.subheader("🏗️ Dados do Equipamento"); crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_uploader")
-        if crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
-            extracted = ai_processor.extract_structured_data(crlv_file, get_crlv_prompt())
+        st.subheader("🏗️ Dados do Equipamento"); 
+        crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_file")
+        # <-- CORREÇÃO 4: Usar o arquivo do session_state
+        if st.session_state.crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
+            extracted = ai_processor.extract_structured_data(st.session_state.crlv_file, get_crlv_prompt())
             if extracted: 
                 st.session_state.placa_form = extracted.get('placa', st.session_state.placa_form)
                 st.session_state.ano_form = extracted.get('ano_fabricacao', st.session_state.ano_form)
@@ -182,18 +184,20 @@ def front_page():
 
         st.subheader("📄 Documentação e Validades"); col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
-            st.markdown("**ART**"); art_file = st.file_uploader("Doc. ART (.pdf)", key="art_uploader")
-            if art_file and st.button("Verificar ART", key="art_button"):
-                 extracted = ai_processor.extract_structured_data(art_file, get_art_prompt())
+            st.markdown("**ART**"); 
+            art_file = st.file_uploader("Doc. ART (.pdf)", key="art_file") 
+            if st.session_state.art_file and st.button("Verificar ART", key="art_button"):
+                 extracted = ai_processor.extract_structured_data(st.session_state.art_file, get_art_prompt())
                  if extracted: 
                     st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form)
                     st.session_state.art_validade_form = extracted.get('validade_art', st.session_state.art_validade_form)
                     st.session_state.art_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Nº ART", key="art_num_form"); st.text_input("Validade ART", key="art_validade_form", disabled=True); display_status(st.session_state.art_status)
         with col_d2:
-            st.markdown("**Certificado NR-11**"); nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_uploader")
-            if nr11_file and st.button("Verificar NR-11", key="nr11_button"):
-                extracted = ai_processor.extract_structured_data(nr11_file, get_nr11_prompt())
+            st.markdown("**Certificado NR-11**"); 
+            nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_file") 
+            if st.session_state.nr11_file and st.button("Verificar NR-11", key="nr11_button"): 
+                extracted = ai_processor.extract_structured_data(st.session_state.nr11_file, get_nr11_prompt())
                 if extracted:
                     st.session_state.nr11_modulo_form = extracted.get('modulo', st.session_state.nr11_modulo_form)
                     st.session_state.nr11_validade_form = extracted.get('validade_nr11', st.session_state.nr11_validade_form)
@@ -203,16 +207,18 @@ def front_page():
             st.selectbox("Módulo NR-11", options=modulos_nr11, key="nr11_modulo_form")
             st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True); display_status(st.session_state.nr11_status)
         with col_d3:
-            st.markdown("**Manutenção (M_PREV)**"); mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_uploader")
-            if mprev_file and st.button("Verificar Manutenção", key="mprev_button"):
-                extracted = ai_processor.extract_structured_data(mprev_file, get_mprev_prompt())
+            st.markdown("**Manutenção (M_PREV)**"); 
+            mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_file") 
+            if st.session_state.mprev_file and st.button("Verificar Manutenção", key="mprev_button"): 
+                extracted = ai_processor.extract_structured_data(st.session_state.mprev_file, get_mprev_prompt())
                 if extracted: 
                     st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', st.session_state.mprev_data_form)
                     st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', st.session_state.mprev_prox_form)
                     st.session_state.mprev_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Última Manutenção", key="mprev_data_form", disabled=True); st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True); display_status(st.session_state.mprev_status)
         
-        st.subheader("Upload de Gráfico de Carga"); grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_uploader", label_visibility="collapsed")
+        st.subheader("Upload de Gráfico de Carga"); 
+        grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_carga_file", label_visibility="collapsed") # <-- CORREÇÃO: Chave
         st.text_area("Observações Adicionais", key="obs_form")
         
         st.divider()
@@ -224,12 +230,15 @@ def front_page():
                 else:
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
                         id_avaliacao = st.session_state.id_avaliacao; uploads = {}
-                        if cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, cnh_doc_file, 'cnh_doc', id_avaliacao)
-                        if crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, crlv_file, 'crlv', id_avaliacao)
-                        if art_file: uploads['art_doc'] = handle_upload_with_id(uploader, art_file, 'art_doc', id_avaliacao)
-                        if nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, nr11_file, 'nr11_doc', id_avaliacao)
-                        if mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, mprev_file, 'mprev_doc', id_avaliacao)
-                        if grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, grafico_carga_file, 'grafico_doc', id_avaliacao)
+                        
+                        # <-- CORREÇÃO FINAL: Usar os arquivos do session_state para fazer o upload
+                        if st.session_state.cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, st.session_state.cnh_doc_file, 'cnh_doc', id_avaliacao)
+                        if st.session_state.crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, st.session_state.crlv_file, 'crlv', id_avaliacao)
+                        if st.session_state.art_file: uploads['art_doc'] = handle_upload_with_id(uploader, st.session_state.art_file, 'art_doc', id_avaliacao)
+                        if st.session_state.nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, st.session_state.nr11_file, 'nr11_doc', id_avaliacao)
+                        if st.session_state.mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, st.session_state.mprev_file, 'mprev_doc', id_avaliacao)
+                        if st.session_state.grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, st.session_state.grafico_carga_file, 'grafico_doc', id_avaliacao)
+                        
                         get_url = lambda key: uploads.get(key, {}).get('url', '') if uploads.get(key) else ''
                         
                         dados_guindauto_row = [
@@ -247,18 +256,18 @@ def front_page():
                         try:
                             uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row); uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
                             st.success(f"✅ Operação registrada com ID: {id_avaliacao}")
-                            keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
+                            
+                            # <-- CORREÇÃO: Limpar também as chaves dos arquivos
+                            keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
                             for key in keys_to_clear: del st.session_state[key]
                             time.sleep(2); st.rerun()
                         except Exception as e: st.error(f"Erro ao salvar nos registros: {e}")
         with col_s2:
             if st.button("🔄 Limpar Formulário", use_container_width=True):
-                keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
+                # <-- CORREÇÃO: Limpar também as chaves dos arquivos
+                keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
-
-
-
 
 
 
