@@ -1,23 +1,86 @@
 import streamlit as st
+import plotly.graph_objects as go
 import pandas as pd
+import numpy as np
+import uuid
+from datetime import datetime, date
 import time
-from datetime import datetime
 import logging
 
-# Importações das funções que foram movidas
-from operations.plot import criar_diagrama_guindaste
-from operations.ui_helpers import mostrar_instrucoes, gerar_id_avaliacao, handle_upload_with_id, display_status
 
-# Importações originais que permanecem necessárias aqui
+from operations.plot import criar_diagrama_guindaste
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from AI.api_Operation import PDFQA
 from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_nr11_prompt, get_mprev_prompt
 
+
 logging.basicConfig(level=logging.INFO)
 
+# --------------------- Funções Utilitárias --------------------
 
+def mostrar_instrucoes():
+    with st.expander("📖 Como usar este aplicativo", expanded=False):
+        st.markdown("""### Guia de Uso
+        
+        1. **Dados da Carga**:
+           * Digite o peso da carga principal em kg
+           * Selecione se o equipamento é novo ou usado
+             - Novo: aplica margem de segurança de 10%
+             - Usado: aplica margem de segurança de 25%
+           * Informe o peso dos acessórios (cintas, grilhetas, etc.)
+           * O peso dos cabos será calculado automaticamente (3%)
+        
+        2. **Dados do Guindaste**:
+           * Preencha as informações do fabricante e modelo
+           * Informe o raio máximo e sua capacidade
+           * Informe a extensão máxima da lança e sua capacidade
+        
+        3. **Resultados**:
+           * O sistema calculará automaticamente:
+             - Margem de segurança
+             - Peso total a considerar
+             - Peso dos cabos
+             - Carga total final
+           * Validará se o guindaste é adequado
+           * Mostrará as porcentagens de utilização
+        
+        ⚠️ **Importante**: Se a utilização ultrapassar 80%, será necessária aprovação da engenharia e segurança.
+        
+        4. **Aba "Dados do Içamento"**: Preencha os dados da carga e do guindaste e clique em **Calcular**.
+        5. **Aba "Informações e Documentos"**:
+            - **Dados do Operador**: Faça o upload da CNH e clique em "Extrair Dados" para preencher as informações do operador.
+            - **Dados do Equipamento**: Faça o upload do CRLV para preencher os dados do veículo.
+            - **Preenchimento Manual**: Preencha ou corrija os demais campos necessários.
+            - **Documentos**: Faça o upload de todos os outros documentos solicitados.
+        6. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
+        """)
+
+
+def gerar_id_avaliacao():
+    return f"AV{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
+
+def handle_upload_with_id(uploader, arquivo, tipo_doc, id_avaliacao):
+    if arquivo is None: return None
+    extensao = arquivo.name.split('.')[-1]; novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
+    try:
+        file_url = uploader.upload_file(arquivo, novo_nome)
+        return {'success': True, 'url': file_url, 'nome': novo_nome}
+    except Exception as e:
+        st.error(f"Erro no upload de '{novo_nome}': {e}"); return {'success': False, 'error': str(e)}
+
+def display_status(status_text):
+    if not status_text: return
+    status_lower = status_text.lower()
+    if "válido" in status_lower or "em dia" in status_lower:
+        st.success(f"Status: {status_text}")
+    elif "vencido" in status_lower:
+        st.error(f"Status: {status_text}")
+    else:
+        st.warning(f"Status: {status_text}")
+
+# --------------------- Página Principal --------------------
 def front_page():
     # Inicialização do session_state
     form_keys = [
@@ -192,4 +255,5 @@ def front_page():
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
 
