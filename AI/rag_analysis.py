@@ -12,7 +12,7 @@ EMBEDDING_MODEL = 'text-embedding-004'
 class RAGAnalyzer:
     def __init__(self):
         load_api()
-        self.model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        self.model = genai.GenerativeModel('gemini-2.5-pro')
         self.knowledge_base_df = self._load_and_embed_knowledge_base()
 
     @st.cache_data(ttl=3600)  # Cache por 1 hora para evitar recarregar e re-embedar constantemente
