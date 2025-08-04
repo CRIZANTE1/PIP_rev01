@@ -46,7 +46,7 @@ def render_document_status(dados_guindauto):
 
     doc_map = {
         "ART (Anot. Resp. Técnica)": "URL ART",
-        "Certificação NR-11": "URL NR-11",
+        "Certificação NR-11": "URL Certificado",
         "CNH do Operador": "URL CNH",
         "CRLV do Veículo": "URL CRLV",
         "Manutenção Preventiva": "URL M_PREV",
@@ -159,6 +159,7 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
 
