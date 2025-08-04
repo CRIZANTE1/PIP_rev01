@@ -216,61 +216,7 @@ def front_page():
         st.text_area("Observações Adicionais", key="obs_form")
         
         st.divider()
-
-
-        st.header("🔬 Análise de Conformidade e Parecer Final")
-        if st.button("Gerar Análise com IA", type="primary", use_container_width=True, help="Analisa todos os dados preenchidos contra a base de conhecimento normativa."):
-            if not st.session_state.dados_icamento:
-                st.error("ERRO: Calcule os dados de içamento na Aba 1 antes de gerar a análise.")
-            else:
-                # 1. Compilar o resumo da operação para a IA
-                summary = f"""
-                - ID da Avaliação: {st.session_state.id_avaliacao}
-                - Empresa: {st.session_state.empresa_form}
-                - Operador: {st.session_state.operador_form} (Status CNH: {st.session_state.cnh_status})
-                - Equipamento: {st.session_state.fabricante_form} {st.session_state.modelo_form} (Placa: {st.session_state.placa_form})
-                - Documentação: Status ART: {st.session_state.art_status}, Status NR-11: {st.session_state.nr11_status}, Status Manutenção: {st.session_state.mprev_status}
-                """
-                
-                icamento = st.session_state.dados_icamento
-                validacao = icamento.get('validacao', {})
-                detalhes = validacao.get('detalhes', {})
-                summary += f"""
-                - Cálculo de Içamento:
-                  - Carga Total: {icamento.get('carga_total', 0):.2f} kg
-                  - Utilização da Capacidade (Raio): {detalhes.get('porcentagem_raio', 0):.1f}%
-                  - Resultado da Validação: {'Adequado' if validacao.get('adequado') else 'NÃO Adequado'}
-                  - Mensagem de Alerta: {validacao.get('mensagem', 'N/A')}
-                """
-
-                # 2. Identificar os "problemas" (issues) para a busca vetorial
-                issues = []
-                if 'vencido' in str(st.session_state.cnh_status).lower(): issues.append("CNH do operador está vencida")
-                if 'vencido' in str(st.session_state.art_status).lower(): issues.append("ART da operação está vencida")
-                if 'vencido' in str(st.session_state.nr11_status).lower(): issues.append("Certificado NR-11 está vencido")
-                if 'vencida' in str(st.session_state.mprev_status).lower(): issues.append("Manutenção preventiva do equipamento está vencida")
-                if not validacao.get('adequado', True):
-                    if "excede 80%" in validacao.get('mensagem', ''):
-                        issues.append("Carga excede 80% da capacidade do guindaste")
-                    if "Ângulo da lança inferior" in validacao.get('mensagem', ''):
-                        issues.append("Ângulo de operação da lança é inseguro")
-                
-                # 3. Chamar o analisador RAG
-                analyzer = RAGAnalyzer()
-                report = analyzer.generate_final_analysis(summary, issues)
-                st.session_state.final_analysis_report = report
-        
-        # 4. Exibir o relatório gerado pela IA
-        if st.session_state.final_analysis_report:
-            with st.container(border=True):
-                st.markdown(st.session_state.final_analysis_report)
-                if st.button("Limpar Análise", key="clear_analysis_btn"):
-                    st.session_state.final_analysis_report = ""
-                    st.rerun()
-
-        st.divider()
-
-        
+       
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button("💾 Salvar Todas as Informações", type="primary", use_container_width=True):
@@ -310,6 +256,7 @@ def front_page():
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
 
 
 
