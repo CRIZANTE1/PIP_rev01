@@ -22,7 +22,6 @@ def load_sheet_data(sheet_name):
         max_cols = len(headers)
         cleaned_rows = []
         for row in rows:
-
             cleaned_row = row[:max_cols] + [None] * (max_cols - len(row))
             cleaned_rows.append(cleaned_row)
             
@@ -36,7 +35,8 @@ def load_sheet_data(sheet_name):
 def make_urls_clickable(df):
     """Transforma colunas que contêm URLs em links HTML clicáveis para a visão geral."""
     for col in df.columns:
-        if "URL" in col.upper():
+        # CORREÇÃO: Usando .str.contains para ser mais flexível com os nomes das colunas de URL
+        if isinstance(df[col].dtype, object) and df[col].str.contains('http', na=False).any():
             df[col] = df[col].apply(lambda x: f'<a href="{x}" target="_blank">Abrir Link</a>' if pd.notna(x) and str(x).startswith('http') else "N/A")
     return df
 
@@ -46,8 +46,8 @@ def render_document_status(dados_guindauto):
     """
     st.subheader("Documentos Avaliados")
 
-    # Mapeia o nome amigável do documento para o nome da coluna de URL na planilha
-    # ATENÇÃO: Os nomes das colunas aqui devem corresponder exatamente aos da sua planilha Google
+    # Ponto de Atenção: Os nomes das colunas aqui (ex: 'URL_ART') DEVEM corresponder
+    # exatamente aos cabeçalhos na sua planilha de "Informações do Guindauto".
     doc_map = {
         "ART (Anot. Resp. Técnica)": "URL_ART",
         "Certificado NR-11": "URL_NR11",
@@ -65,6 +65,15 @@ def render_document_status(dados_guindauto):
         else:
             st.markdown(f"❌ **{doc_name}**: Documento não fornecido")
 
+def safe_to_numeric(series):
+    """
+    Converte uma série para numérico de forma segura, tratando vírgulas como decimais.
+    """
+    if series is None:
+        return None
+    # Converte para string, substitui vírgula por ponto, e então converte para numérico
+    return pd.to_numeric(str(series).replace(',', '.'), errors='coerce')
+
 def render_diagrama(dados_icamento):
     """
     Renderiza o diagrama de içamento a partir dos dados históricos.
@@ -72,14 +81,13 @@ def render_diagrama(dados_icamento):
     st.subheader("Diagrama da Operação")
     
     try:
-        # Extrai os parâmetros necessários, convertendo para numérico para segurança
-        raio_max = pd.to_numeric(dados_icamento.get('Raio Máximo (m)'), errors='coerce')
-        alcance_max = pd.to_numeric(dados_icamento.get('Extensão Máxima da Lança (m)'), errors='coerce')
-        carga_total = pd.to_numeric(dados_icamento.get('CARGA TOTAL'), errors='coerce')
-        capacidade_raio = pd.to_numeric(dados_icamento.get('Capacidade no Raio Máximo (kg)'), errors='coerce')
-        angulo_minimo = pd.to_numeric(dados_icamento.get('Ângulo Mínimo da Lança (°)'), errors='coerce')
+        # CORREÇÃO: Usando os nomes de coluna corretos do seu arquivo e a conversão segura.
+        raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
+        alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
+        carga_total = safe_to_numeric(dados_icamento.get('Carga Total (kg)'))
+        capacidade_raio = safe_to_numeric(dados_icamento.get('Capacidade Raio (kg)'))
+        angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
         
-        # Verifica se todos os dados necessários estão presentes
         if all(pd.notna([raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo])):
             fig = criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo)
             st.plotly_chart(fig, use_container_width=True)
@@ -119,13 +127,12 @@ def show_history_page():
             result_crane = df_crane[df_crane[id_column] == search_id]
 
             if not result_lifting.empty and not result_crane.empty:
-                # Pega a primeira (e única) linha de resultado
                 dados_icamento = result_lifting.iloc[0]
                 dados_guindauto = result_crane.iloc[0]
 
                 st.header(f"Análise Detalhada da Avaliação: {search_id}")
 
-                col1, col2 = st.columns([2, 1]) # Coluna do gráfico maior
+                col1, col2 = st.columns([2, 1])
 
                 with col1:
                     render_diagrama(dados_icamento)
@@ -133,19 +140,24 @@ def show_history_page():
                 with col2:
                     st.subheader("Principais Indicadores")
                     
-                    carga_total_val = pd.to_numeric(dados_icamento.get('CARGA TOTAL', 0), errors='coerce')
+                    # CORREÇÃO: Usando o nome correto da coluna e a função de conversão segura.
+                    carga_total_val = safe_to_numeric(dados_icamento.get('Carga Total (kg)', 0))
                     st.metric("Carga Total da Operação", f"{carga_total_val:,.2f} kg".replace(",", "."))
                     
-                    st.metric("Utilização no Raio", f"{dados_icamento.get('Utilização (%) Raio', 'N/A')}")
-                    st.metric("Utilização na Lança", f"{dados_icamento.get('Utilização (%) Lança', 'N/A')}")
+                    # CORREÇÃO: Usando os nomes corretos das colunas de utilização.
+                    st.metric("Utilização no Raio", dados_icamento.get('% Utilização Raio', 'N/A'))
+                    st.metric("Utilização na Lança", dados_icamento.get('% Utilização Alcance', 'N/A'))
                     
-                    adequado = dados_icamento.get('Guindaste Adequado?')
-                    if str(adequado).upper() == 'TRUE':
+                    # CORREÇÃO: Usando o nome correto da coluna 'Adequado'.
+                    adequado = dados_icamento.get('Adequado')
+                    if str(adequado).strip().upper() == 'TRUE':
                         st.success("✅ Operação Aprovada")
                     else:
                         st.error("❌ Operação Reprovada")
                     
                     st.markdown("---")
+                    # CORREÇÃO: Os nomes das colunas de operador e placa precisam ser exatos.
+                    # Verifique sua planilha, estes são palpites comuns.
                     st.write(f"**Operador:** {dados_guindauto.get('Nome do Operador', 'N/A')}")
                     st.write(f"**Veículo (Placa):** {dados_guindauto.get('Placa', 'N/A')}")
 
@@ -156,7 +168,6 @@ def show_history_page():
                     st.subheader("Dados de Içamento")
                     st.dataframe(result_lifting.T, use_container_width=True)
                     st.subheader("Informações do Guindauto")
-                    # Prepara a visualização dos dados brutos com links clicáveis
                     result_crane_clickable = make_urls_clickable(result_crane.copy())
                     st.markdown(result_crane_clickable.T.to_html(escape=False), unsafe_allow_html=True)
 
@@ -180,3 +191,4 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
