@@ -90,7 +90,7 @@ def front_page():
         'placa_form', 'modelo_form', 'fabricante_form', 'ano_form', 
         'art_num_form', 'art_validade_form', 'art_status', 'obs_form', 
         'nr11_modulo_form', 'nr11_validade_form', 'nr11_status',
-        'mprev_data_form', 'mprev_prox_form', 'mprev_status'
+        'mprev_data_form', 'mprev_prox_form', 'mprev_status','final_analysis_report'
     ]
     for key in form_keys:
         if key not in st.session_state: st.session_state[key] = ""
@@ -311,6 +311,7 @@ def front_page():
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
 
 
 
