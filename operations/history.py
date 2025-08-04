@@ -32,22 +32,8 @@ def make_urls_clickable(df):
 
 @st.cache_data(ttl=900) # Cache para não reanalisar o mesmo doc repetidamente
 def analyze_document_live(doc_url, prompt_function):
-    """
-    Função para analisar um documento a partir de sua URL do Google Drive com a IA.
-    A URL do Drive não é diretamente acessível, então esta função é um placeholder conceitual.
-    Para que isso funcione, a IA precisaria de um PDF, não de uma URL.
-    
-    A implementação CORRETA requer que os arquivos sejam salvos de uma forma que a IA possa ler.
-    Como a IA só lê bytes de arquivos, não URLs, a reanálise ao vivo não é viável com a estrutura atual.
-    
-    A SOLUÇÃO REAL é a que foi proposta anteriormente: SALVAR O STATUS.
-    Como você pediu para não fazer isso, vamos SIMULAR o comportamento sem chamar a IA,
-    e você pode preencher a lógica se tiver um método para buscar os bytes do arquivo pela URL.
-    
-    Por enquanto, vamos apenas exibir o link se ele existir.
-    """
     # Esta função é um STUB. A lógica real de reanálise é complexa.
-    # Sem uma forma de obter os bytes do PDF a partir da URL do Google Drive,
+    # Sem uma forma de obter os bytes do PDF a partir da URL do Google Drive.
     # não podemos reenviar para a IA.
     # A solução mais pragmática e que funciona é salvar o status no front.py.
     pass # Deixando a função vazia por enquanto.
@@ -173,5 +159,6 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
