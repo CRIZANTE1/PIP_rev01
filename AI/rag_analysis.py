@@ -7,8 +7,95 @@ from google.oauth2.service_account import Credentials
 
 from AI.api_load import configure_google_api
 from gdrive.config import get_credentials_dict
+from gdrive.gdrive_upload import GoogleDriveUploader # <--- ADICIONE ESTA IMPORTAÇÃO
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+@st.cache_resource
+def configure_google_api():
+    """
+    Carrega a chave API e configura a biblioteca do Google.
+    Retorna True se bem-sucedido, False caso contrário.
+    """
+    try:
+        api_key = st.secrets.general.GOOGLE_API_KEY
+        logging.info("Chave de API do Google encontrada nos secrets do Streamlit.")
+    except (AttributeError, KeyError):
+        st.error("ERRO CRÍTICO: GOOGLE_API_KEY não encontrada em st.secrets.general.")
+        return False
+    
+    if not api_key:
+        st.error("ERRO CRÍTICO: A GOOGLE_API_KEY está vazia nos secrets.")
+        return False
+
+    try:
+        genai.configure(api_key=api_key)
+        logging.info("API do Google Generative AI configurada com sucesso.")
+        return True
+    except Exception as e:
+        st.error(f"Erro ao configurar a API do Google: {str(e)}")
+        return False
+
+@st.cache_resource(ttl=3600)
+def load_and_embed_rag_base() -> tuple[pd.DataFrame, np.ndarray | None]:
+    """
+    Carrega a planilha RAG, gera embeddings para cada chunk e armazena em cache.
+    """
+    # 1. Garante que a API Generativa do Google esteja configurada (para embeddings)
+    if not configure_google_api():
+        st.error("A API Generativa não pôde ser configurada. A base de conhecimento não será carregada.")
+        return pd.DataFrame(), None
+        
+    try:
+        sheet_id = st.secrets.rag_config.sheet_id
+    except (AttributeError, KeyError):
+        st.error("Erro de configuração: A chave 'sheet_id' não foi encontrada na seção [rag_config] dos secrets.")
+        return pd.DataFrame(), None
+
+    try:
+        # 2. Carrega os dados da planilha usando gspread com credenciais explícitas
+        st.info("Autenticando com a API do Google Sheets...")
+        # Escopo necessário para ler planilhas
+        scopes = ["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        creds_dict = get_credentials_dict()
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        
+        # Autoriza o cliente gspread com as credenciais
+        gc = gspread.authorize(creds)
+        
+        st.info(f"Acessando a planilha com ID: {sheet_id}...")
+        spreadsheet = gc.open_by_key(sheet_id)
+        worksheet = spreadsheet.sheet1 
+        df = pd.DataFrame(worksheet.get_all_records())
+
+        if df.empty or "Answer_Chunk" not in df.columns:
+            st.error("A planilha RAG está vazia ou não contém a coluna 'Answer_Chunk'.")
+            return pd.DataFrame(), None
+
+        # 3. Gera os embeddings
+        with st.spinner(f"Indexando a base de conhecimento ({len(df)} itens)..."):
+            chunks_to_embed = df["Answer_Chunk"].astype(str).tolist()
+            result = genai.embed_content(
+                model=EMBEDDING_MODEL,
+                content=chunks_to_embed,
+                task_type="RETRIEVAL_DOCUMENT",
+                title="Normas de Segurança para Içamento de Carga"
+            )
+            embeddings = np.array(result['embedding'])
+        
+        st.success("Base de conhecimento indexada e pronta para uso!")
+        return df, embeddings
+
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error(f"ERRO: A planilha com o ID '{sheet_id}' não foi encontrada. Verifique se o ID está correto nos secrets e se a conta de serviço ({creds_dict.get('client_email')}) tem permissão para acessá-la.")
+        return pd.DataFrame(), None
+    except Exception as e:
+        # Captura o erro 403 aqui e dá uma mensagem mais clara
+        if "PERMISSION_DENIED" in str(e) or "403" in str(e):
+             st.error(f"ERRO DE PERMISSÃO (403): A API do Google Sheets negou o acesso. Verifique se a 'Google Sheets API' está habilitada no seu projeto do Google Cloud e se a conta de serviço ({creds_dict.get('client_email')}) foi compartilhada com a planilha.")
+        else:
+            st.error(f"Falha ao carregar ou processar a base de conhecimento: {e}")
+        return pd.DataFrame(), None
 
 
 class RAGAnalyzer:
