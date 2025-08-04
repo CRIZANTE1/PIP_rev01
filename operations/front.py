@@ -9,6 +9,7 @@ import logging
 
 
 from operations.plot import criar_diagrama_guindaste
+from AI.rag_analysis import RAGAnalyzer
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
@@ -310,6 +311,7 @@ def front_page():
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
 
 
 
