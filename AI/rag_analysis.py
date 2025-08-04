@@ -11,15 +11,21 @@ from gdrive.gdrive_upload import GoogleDriveUploader # <--- ADICIONE ESTA IMPORT
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+import streamlit as st
+import google.generativeai as genai
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 @st.cache_resource
 def configure_google_api():
     """
-    Carrega a chave API e configura a biblioteca do Google.
+    Carrega a chave API dos secrets e configura a biblioteca do Google.
+    Esta função é chamada uma vez no início da aplicação.
     Retorna True se bem-sucedido, False caso contrário.
     """
     try:
         api_key = st.secrets.general.GOOGLE_API_KEY
-        logging.info("Chave de API do Google encontrada nos secrets do Streamlit.")
     except (AttributeError, KeyError):
         st.error("ERRO CRÍTICO: GOOGLE_API_KEY não encontrada em st.secrets.general.")
         return False
