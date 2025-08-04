@@ -1,7 +1,4 @@
 import streamlit as st
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from operations.front import front_page
 from operations.history import show_history_page
 from operations.demo_page import show_demo_page
