@@ -17,9 +17,7 @@ from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_n
 
 logging.basicConfig(level=logging.INFO)
 
-# --------------------- Página Principal --------------------
-# O código restante é o corpo original da sua função front_page,
-# sem as funções que foram movidas para os outros arquivos.
+
 def front_page():
     # Inicialização do session_state
     form_keys = [
@@ -194,3 +192,4 @@ def front_page():
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'upload' in k or 'id_avaliacao' in k or 'dados_icamento' in k]; 
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
