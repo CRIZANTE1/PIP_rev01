@@ -4,6 +4,7 @@ from operations.history import show_history_page
 from operations.demo_page import show_demo_page
 from auth.login_page import show_login_page, show_user_header, show_logout_button
 from auth.auth_utils import is_user_logged_in, is_admin_user
+from AI.api_load import configure_google_api
 
 def main():
     st.set_page_config(
@@ -33,3 +34,4 @@ if __name__ == "__main__":
     main()
     st.caption('Copyright 2024, Cristian Ferreira Carlos, Todos os direitos reservados.')
     st.caption('https://www.linkedin.com/in/cristian-ferreira-carlos-256b19161/')
+
