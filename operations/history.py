@@ -1,15 +1,13 @@
-
 import streamlit as st
 import pandas as pd
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
-
+from operations.plot import criar_diagrama_guindaste 
 
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
     """
-    Carrega dados de uma aba específica do Google Sheets e os converte em um DataFrame do Pandas.
-    A função é armazenada em cache para melhor desempenho.
+    Carrega dados de uma aba específica do Google Sheets e os converte em um DataFrame.
     """
     try:
         uploader = GoogleDriveUploader()
@@ -21,10 +19,10 @@ def load_sheet_data(sheet_name):
         headers = data[0]
         rows = data[1:]
         
-        
         max_cols = len(headers)
         cleaned_rows = []
         for row in rows:
+
             cleaned_row = row[:max_cols] + [None] * (max_cols - len(row))
             cleaned_rows.append(cleaned_row)
             
@@ -36,15 +34,66 @@ def load_sheet_data(sheet_name):
         return pd.DataFrame()
 
 def make_urls_clickable(df):
-    """Transforma colunas que contêm URLs em links HTML clicáveis."""
+    """Transforma colunas que contêm URLs em links HTML clicáveis para a visão geral."""
     for col in df.columns:
         if "URL" in col.upper():
             df[col] = df[col].apply(lambda x: f'<a href="{x}" target="_blank">Abrir Link</a>' if pd.notna(x) and str(x).startswith('http') else "N/A")
     return df
 
+def render_document_status(dados_guindauto):
+    """
+    Renderiza uma lista de documentos com ícones de status (✅/❌) e links.
+    """
+    st.subheader("Documentos Avaliados")
+
+    # Mapeia o nome amigável do documento para o nome da coluna de URL na planilha
+    # ATENÇÃO: Os nomes das colunas aqui devem corresponder exatamente aos da sua planilha Google
+    doc_map = {
+        "ART (Anot. Resp. Técnica)": "URL_ART",
+        "Certificado NR-11": "URL_NR11",
+        "CNH do Operador": "URL_CNH",
+        "CRLV do Veículo": "URL_CRLV",
+        "Manutenção Preventiva": "URL_M_PREV",
+        "Gráfico de Carga": "URL_GRAFICO"
+    }
+
+    for doc_name, col_name in doc_map.items():
+        url = dados_guindauto.get(col_name)
+
+        if pd.notna(url) and str(url).strip().startswith('http'):
+            st.markdown(f"✅ **{doc_name}**: <a href='{url}' target='_blank'>Abrir Documento</a>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"❌ **{doc_name}**: Documento não fornecido")
+
+def render_diagrama(dados_icamento):
+    """
+    Renderiza o diagrama de içamento a partir dos dados históricos.
+    """
+    st.subheader("Diagrama da Operação")
+    
+    try:
+        # Extrai os parâmetros necessários, convertendo para numérico para segurança
+        raio_max = pd.to_numeric(dados_icamento.get('Raio Máximo (m)'), errors='coerce')
+        alcance_max = pd.to_numeric(dados_icamento.get('Extensão Máxima da Lança (m)'), errors='coerce')
+        carga_total = pd.to_numeric(dados_icamento.get('CARGA TOTAL'), errors='coerce')
+        capacidade_raio = pd.to_numeric(dados_icamento.get('Capacidade no Raio Máximo (kg)'), errors='coerce')
+        angulo_minimo = pd.to_numeric(dados_icamento.get('Ângulo Mínimo da Lança (°)'), errors='coerce')
+        
+        # Verifica se todos os dados necessários estão presentes
+        if all(pd.notna([raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo])):
+            fig = criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("Não foi possível gerar o diagrama. Dados insuficientes ou inválidos no registro.")
+    
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao renderizar o diagrama: {e}")
+
+
 def show_history_page():
     st.title("Histórico de Avaliações")
     st.info("Os dados são atualizados a cada 10 minutos. Para forçar a atualização, limpe o cache.")
+    
     if st.button("Limpar Cache e Recarregar Dados"):
         st.cache_data.clear()
         st.rerun()
@@ -57,43 +106,65 @@ def show_history_page():
         st.warning("Não foi possível carregar os dados do histórico ou as planilhas estão vazias.")
         return
 
-    st.subheader("Buscar Avaliação por ID")
-    # Usa a primeira coluna (geralmente 'ID') para a busca
+    st.subheader("Buscar e Analisar Avaliação por ID")
     id_column = df_lifting.columns[0] if not df_lifting.empty else (df_crane.columns[0] if not df_crane.empty else None)
     
     if id_column:
         search_id = st.text_input("Digite o ID da Avaliação (ex: AV20240101-abcdefgh)", key="search_id_input")
 
-        if st.button("Buscar por ID", key="search_button"):
-            if search_id:
-                st.markdown("---")
-                st.subheader(f"Resultados para o ID: {search_id}")
+        if st.button("Buscar por ID", key="search_button") and search_id:
+            st.markdown("---")
+            
+            result_lifting = df_lifting[df_lifting[id_column] == search_id]
+            result_crane = df_crane[df_crane[id_column] == search_id]
 
-                # Busca no DataFrame de Içamento
-                result_lifting = df_lifting[df_lifting[id_column] == search_id]
-                if not result_lifting.empty:
-                    with st.expander("Dados de Içamento", expanded=True):
-                        # Transpõe o DataFrame para melhor visualização de um único registro
-                        st.dataframe(result_lifting.T, use_container_width=True)
-                else:
-                    st.info("Nenhum dado de içamento encontrado para este ID.")
+            if not result_lifting.empty and not result_crane.empty:
+                # Pega a primeira (e única) linha de resultado
+                dados_icamento = result_lifting.iloc[0]
+                dados_guindauto = result_crane.iloc[0]
+
+                st.header(f"Análise Detalhada da Avaliação: {search_id}")
+
+                col1, col2 = st.columns([2, 1]) # Coluna do gráfico maior
+
+                with col1:
+                    render_diagrama(dados_icamento)
+
+                with col2:
+                    st.subheader("Principais Indicadores")
+                    
+                    carga_total_val = pd.to_numeric(dados_icamento.get('CARGA TOTAL', 0), errors='coerce')
+                    st.metric("Carga Total da Operação", f"{carga_total_val:,.2f} kg".replace(",", "."))
+                    
+                    st.metric("Utilização no Raio", f"{dados_icamento.get('Utilização (%) Raio', 'N/A')}")
+                    st.metric("Utilização na Lança", f"{dados_icamento.get('Utilização (%) Lança', 'N/A')}")
+                    
+                    adequado = dados_icamento.get('Guindaste Adequado?')
+                    if str(adequado).upper() == 'TRUE':
+                        st.success("✅ Operação Aprovada")
+                    else:
+                        st.error("❌ Operação Reprovada")
+                    
+                    st.markdown("---")
+                    st.write(f"**Operador:** {dados_guindauto.get('Nome do Operador', 'N/A')}")
+                    st.write(f"**Veículo (Placa):** {dados_guindauto.get('Placa', 'N/A')}")
+
+                st.markdown("---")
+                render_document_status(dados_guindauto)
                 
-                # Busca no DataFrame de Guindauto
-                result_crane = df_crane[df_crane[id_column] == search_id]
-                if not result_crane.empty:
-                    with st.expander("Informações do Guindauto", expanded=True):
-                        # Formata as URLs para serem clicáveis antes de exibir
-                        result_crane_clickable = make_urls_clickable(result_crane.copy())
-                        # Transpõe e exibe como HTML para renderizar os links
-                        st.markdown(result_crane_clickable.T.to_html(escape=False), unsafe_allow_html=True)
-                else:
-                    st.info("Nenhuma informação de guindauto encontrada para este ID.")
+                with st.expander("Ver todos os dados brutos desta avaliação"):
+                    st.subheader("Dados de Içamento")
+                    st.dataframe(result_lifting.T, use_container_width=True)
+                    st.subheader("Informações do Guindauto")
+                    # Prepara a visualização dos dados brutos com links clicáveis
+                    result_crane_clickable = make_urls_clickable(result_crane.copy())
+                    st.markdown(result_crane_clickable.T.to_html(escape=False), unsafe_allow_html=True)
 
             else:
-                st.warning("Por favor, digite um ID para buscar.")
+                st.warning(f"Nenhum registro completo encontrado para o ID: {search_id}. Verifique se o ID está correto e se há dados em ambas as planilhas.")
 
     st.markdown("---")
-    st.subheader("Histórico Completo")
+    st.subheader("Histórico Completo (Visão Geral)")
     
     tab1, tab2 = st.tabs(["Dados de Içamento", "Informações do Guindauto"])
 
@@ -106,7 +177,6 @@ def show_history_page():
     with tab2:
         if not df_crane.empty:
             df_crane_clickable = make_urls_clickable(df_crane.copy())
-            # Exibe o DataFrame como HTML para que os links funcionem
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
