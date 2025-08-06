@@ -43,7 +43,7 @@ def render_document_status(dados_guindauto):
     st.subheader("Documentos Avaliados")
     doc_map = {
         "ART (Anot. Resp. Técnica)": {"url_col": "URL ART", "date_col": "Validade ART"},
-        "Certificação NR-11":        {"url_col": "URL NR-11", "date_col": None},
+        "Certificação NR-11":        {"url_col": "URL Certificado", "date_col": None},
         "CNH do Operador":           {"url_col": "URL CNH", "date_col": "Validade CNH"},
         "Manutenção Preventiva":     {"url_col": "URL M_PREV", "date_col": "Próxima Manutenção"},
         "CRLV do Veículo":           {"url_col": "URL CRLV", "date_col": None},
@@ -184,6 +184,7 @@ def show_history_page():
             )
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
 
