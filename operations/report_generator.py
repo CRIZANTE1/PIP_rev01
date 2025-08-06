@@ -104,37 +104,16 @@ def get_report_html(context):
 
 def get_report_css():
     css = """
-    @page {
-        /* CORREÇÃO: Voltando para A4 portrait (vertical) */
-        size: A4;
-        /* CORREÇÃO: Margens ABNT originais para retrato */
-        margin: 3cm 2cm 2cm 3cm;
-        @bottom-right {
-            content: counter(page);
-            font-family: 'Times New Roman', serif;
-            font-size: 12pt;
-        }
-    }
+    @page { size: A4; margin: 3cm 2cm 2cm 3cm; @bottom-right { content: counter(page); font-size: 12pt; } }
     body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
     h1, h2, h3 { font-family: 'Arial', sans-serif; color: #333; font-weight: bold; text-align: left; }
-    h1 { font-size: 14pt; margin-top: 24pt; }
-    h2 { font-size: 12pt; margin-top: 18pt; }
-    p { text-indent: 4em; margin-bottom: 12pt; }
-    ul { list-style-position: inside; padding-left: 4em; }
+    h1 { font-size: 14pt; margin-top: 24pt; } h2 { font-size: 12pt; margin-top: 18pt; }
+    p { text-indent: 4em; margin-bottom: 12pt; } ul { list-style-position: inside; padding-left: 4em; }
     .cover-page { page-break-after: always; text-align: center; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-    .cover-page h1, .cover-page h2, .cover-page h3 { text-align: center; }
-    .cover-footer { text-indent: 0; margin-top: auto; }
+    .cover-page h1, .cover-page h2, .cover-page h3, .cover-page p { text-align: center; text-indent: 0; }
     img { max-width: 100%; display: block; margin: 10px auto; border: 1px solid #ccc; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-    td { border: 1px solid #ccc; padding: 8px; }
-    .total-row { background-color: #f2f2f2; }
-    
-    /* CORREÇÃO: Removendo o layout de duas colunas */
-    /*
-    .content-wrapper { display: flex; flex-direction: row; gap: 20px; }
-    .column-left { flex: 1; }
-    .column-right { flex: 1.5; }
-    */
+    td { border: 1px solid #ccc; padding: 8px; } .total-row { background-color: #f2f2f2; }
     """
     return css
 
@@ -142,24 +121,16 @@ def generate_abnt_report(dados_icamento, dados_guindauto):
     raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
     alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
     angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
-    if pd.isna(angulo_minimo):
-        angulo_minimo = 40.0
-
+    if pd.isna(angulo_minimo): angulo_minimo = 40.0
     diagrama_base64_url = generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo)
-
     context = {
-        "id_avaliacao": dados_icamento.name,
-        "cidade": "Barueri, SP",
+        "id_avaliacao": dados_icamento.name, "cidade": "Barueri, SP",
         "data_emissao": datetime.now().strftime("%d de %B de %Y"),
-        "dados_icamento": dados_icamento,
-        "dados_guindauto": dados_guindauto,
+        "dados_icamento": dados_icamento, "dados_guindauto": dados_guindauto,
         "diagrama_base64": diagrama_base64_url
     }
-
     html_string = get_report_html(context)
     css_string = get_report_css()
-
     css = CSS(string=css_string)
     pdf_bytes = HTML(string=html_string).write_pdf(stylesheets=[css])
-
     return pdf_bytes
