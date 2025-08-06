@@ -1,5 +1,3 @@
-# operations/report_generator.py
-
 from weasyprint import HTML, CSS
 import pandas as pd
 from datetime import datetime
