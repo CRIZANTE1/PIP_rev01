@@ -18,7 +18,6 @@ from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_n
 
 logging.basicConfig(level=logging.INFO)
 
-# --------------------- Funções Utilitárias --------------------
 
 def mostrar_instrucoes():
     with st.expander("📖 Como usar este aplicativo", expanded=False):
@@ -80,9 +79,7 @@ def display_status(status_text):
     else:
         st.warning(f"Status: {status_text}")
 
-# --------------------- Página Principal --------------------
 def front_page():
-    # Inicialização do session_state
     form_keys = [
         'empresa_form', 'cnpj_form', 'telefone_form', 'email_form', 
         'operador_form', 'cpf_form', 'cnh_form', 'cnh_validade_form', 'cnh_status', 
@@ -125,15 +122,27 @@ def front_page():
             with col4:
                 alcance_max = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
                 capacidade_alcance = st.number_input("Capacidade na Lança Máxima (kg)", min_value=0.1, step=100.0)
-                angulo_minimo_fabricante = st.number_input("Ângulo Mínimo da Lança (°)", min_value=1.0, max_value=89.0, value=30.0)
+                angulo_minimo_fabricante = st.number_input("Ângulo Mínimo da Lança (°)", min_value=1.0, max_value=89.0, value=40.0)
             if st.form_submit_button("Calcular"):
                 try:
                     resultado = calcular_carga_total(peso_carga, estado_equipamento=="Novo", peso_acessorios)
-                    st.session_state.dados_icamento = {**resultado, 'fabricante_guindaste': fabricante_guindaste_calc, 'modelo_guindaste': modelo_guindaste_calc, 'raio_max': raio_max, 'capacidade_raio': capacidade_raio, 'alcance_max': alcance_max, 'capacidade_alcance': capacidade_alcance, 'angulo_minimo_fabricante': angulo_minimo_fabricante}
+                    st.session_state.dados_icamento = {
+                        **resultado,
+                        'fabricante_guindaste': fabricante_guindaste_calc,
+                        'nome_guindaste': nome_guindaste_calc,
+                        'modelo_guindaste': modelo_guindaste_calc,
+                        'raio_max': raio_max,
+                        'capacidade_raio': capacidade_raio,
+                        'alcance_max': alcance_max,
+                        'capacidade_alcance': capacidade_alcance,
+                        'angulo_minimo_fabricante': angulo_minimo_fabricante
+                    }
                     validacao = validar_guindaste(resultado['carga_total'], capacidade_raio, capacidade_alcance, raio_max, alcance_max)
                     st.session_state.dados_icamento['validacao'] = validacao
                     st.success("Cálculo realizado. Verifique os resultados abaixo.")
                 except Exception as e: st.error(f"Erro no cálculo: {e}")
+
+        
         if st.session_state.dados_icamento:
             res = st.session_state.dados_icamento; val = res.get('validacao', {})
             st.subheader("📊 Resultados do Cálculo"); st.table(pd.DataFrame({'Descrição': ['Peso da carga', 'Margem (%)', 'Peso Segurança', 'Peso a Considerar', 'Peso Cabos (3%)', 'Peso Acessórios', 'CARGA TOTAL'], 'Valor (kg)': [f"{res.get(k, 0):.2f}" for k in ['peso_carga', 'margem_seguranca_percentual', 'peso_seguranca', 'peso_considerar', 'peso_cabos', 'peso_acessorios']] + [f"**{res.get('carga_total', 0):.2f}**"]}))
@@ -143,7 +152,6 @@ def front_page():
             c1, c2 = st.columns(2); c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%"); c2.metric("Utilização na Lança", f"{val.get('detalhes', {}).get('porcentagem_alcance', 0):.1f}%")
             st.plotly_chart(criar_diagrama_guindaste(res['raio_max'], res['alcance_max'], res['carga_total'], res['capacidade_raio'], res['angulo_minimo_fabricante']), use_container_width=True)
 
-    # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
         st.header("Informações e Documentos do Guindauto")
         st.info(f"ID da Avaliação: **{st.session_state.id_avaliacao}**")
@@ -171,7 +179,6 @@ def front_page():
 
         st.subheader("🏗️ Dados do Equipamento"); 
         crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_file")
-        # <-- CORREÇÃO 4: Usar o arquivo do session_state
         if st.session_state.crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
             extracted = ai_processor.extract_structured_data(st.session_state.crlv_file, get_crlv_prompt())
             if extracted: 
@@ -218,7 +225,7 @@ def front_page():
             st.text_input("Última Manutenção", key="mprev_data_form", disabled=True); st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True); display_status(st.session_state.mprev_status)
         
         st.subheader("Upload de Gráfico de Carga"); 
-        grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_carga_file", label_visibility="collapsed") # <-- CORREÇÃO: Chave
+        grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_carga_file", label_visibility="collapsed") 
         st.text_area("Observações Adicionais", key="obs_form")
         
         st.divider()
@@ -231,7 +238,6 @@ def front_page():
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
                         id_avaliacao = st.session_state.id_avaliacao; uploads = {}
                         
-                        # <-- CORREÇÃO FINAL: Usar os arquivos do session_state para fazer o upload
                         if st.session_state.cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, st.session_state.cnh_doc_file, 'cnh_doc', id_avaliacao)
                         if st.session_state.crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, st.session_state.crlv_file, 'crlv', id_avaliacao)
                         if st.session_state.art_file: uploads['art_doc'] = handle_upload_with_id(uploader, st.session_state.art_file, 'art_doc', id_avaliacao)
@@ -251,23 +257,42 @@ def front_page():
                         ]
                         
                         d_icamento = st.session_state.dados_icamento; v_icamento = d_icamento.get('validacao', {}); det_icamento = v_icamento.get('detalhes', {})
-                        dados_icamento_row = [id_avaliacao, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), d_icamento.get('peso_carga'), d_icamento.get('margem_seguranca_percentual'), d_icamento.get('peso_seguranca'), d_icamento.get('peso_cabos'), d_icamento.get('peso_acessorios'), d_icamento.get('carga_total'), v_icamento.get('adequado'), f"{det_icamento.get('porcentagem_raio', 0):.1f}%", f"{det_icamento.get('porcentagem_alcance', 0):.1f}%", d_icamento.get('fabricante_guindaste'), d_icamento.get('modelo_guindaste'), d_icamento.get('raio_max'), d_icamento.get('capacidade_raio'), d_icamento.get('alcance_max'), d_icamento.get('capacidade_alcance'), d_icamento.get('angulo_minimo_fabricante')]
+                        dados_icamento_row = [
+                            id_avaliacao,
+                            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            d_icamento.get('peso_carga'),
+                            d_icamento.get('margem_seguranca_percentual'),
+                            d_icamento.get('peso_seguranca'),
+                            d_icamento.get('peso_cabos'),
+                            d_icamento.get('peso_acessorios'),
+                            d_icamento.get('carga_total'),
+                            v_icamento.get('adequado'),
+                            f"{det_icamento.get('porcentagem_raio', 0):.1f}%",
+                            f"{det_icamento.get('porcentagem_alcance', 0):.1f}%",
+                            d_icamento.get('fabricante_guindaste'),
+                            d_icamento.get('nome_guindaste'),      
+                            d_icamento.get('modelo_guindaste'),    
+                            d_icamento.get('raio_max'),
+                            d_icamento.get('capacidade_raio'),
+                            d_icamento.get('alcance_max'),
+                            d_icamento.get('capacidade_alcance'),
+                            d_icamento.get('angulo_minimo_fabricante')
+                        ]
 
                         try:
                             uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row); uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
                             st.success(f"✅ Operação registrada com ID: {id_avaliacao}")
                             
-                            # <-- CORREÇÃO: Limpar também as chaves dos arquivos
                             keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
                             for key in keys_to_clear: del st.session_state[key]
                             time.sleep(2); st.rerun()
                         except Exception as e: st.error(f"Erro ao salvar nos registros: {e}")
         with col_s2:
             if st.button("🔄 Limpar Formulário", use_container_width=True):
-                # <-- CORREÇÃO: Limpar também as chaves dos arquivos
                 keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
                 for key in keys_to_clear: del st.session_state[key]
                 st.warning("⚠️ Formulário limpo."); st.rerun()
+
 
 
 
