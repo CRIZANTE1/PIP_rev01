@@ -92,62 +92,43 @@ def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio
 
 
 def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabricante):
-    """
-    CORREÇÃO FINAL: Cria um diagrama estático com a Zona de Risco dimensionada corretamente.
-    """
-    # Cálculos
+    # (Esta função permanece a mesma da versão anterior, já está correta)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.set_aspect('equal', adjustable='box')
     angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
     angulo_operacao_graus = np.degrees(angulo_operacao_rad)
     angulo_min_rad = np.radians(angulo_minimo_fabricante)
     comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    ax.set_aspect('equal', adjustable='box')
-
     base_width = max(4, raio_max * 0.05)
     torre_height = max(2, alcance_max * 0.05)
     ax.fill([-base_width/2, base_width/2, base_width/2, -base_width/2], [-torre_height/2, -torre_height/2, 0, 0], color='lightgray', zorder=1)
     ax.plot([0, 0], [0, torre_height], color='dimgray', linewidth=8, zorder=2)
-
     y_lan_end = torre_height + alcance_max
-    # CORREÇÃO SUTIL DE COR: Usando 'royalblue' para combinar com a imagem de exemplo
     cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
-    ax.plot([0, raio_max], [torre_height, y_lan_end], color=cor_lanca, linewidth=8, zorder=4, label='Lança de Operação') # Linha mais grossa
-
-    # --- CORREÇÃO DA ZONA DE RISCO ---
-    # O raio da zona de risco agora é o próprio comprimento da lança, para um visual contido.
+    ax.plot([0, raio_max], [torre_height, y_lan_end], color=cor_lanca, linewidth=8, zorder=4, label='Lança de Operação')
     raio_risco = comprimento_lanca
-    
     theta_risco = np.linspace(0, angulo_min_rad, 50)
     x_risco_arc = raio_risco * np.cos(theta_risco)
     y_risco_arc = torre_height + raio_risco * np.sin(theta_risco)
     x_poly = np.concatenate([[0], x_risco_arc])
     y_poly = np.concatenate([[torre_height], y_risco_arc])
-    
-    # CORREÇÃO SUTIL DE COR: Usando 'pink' e alpha=0.5 para combinar com a imagem de exemplo
     ax.fill(x_poly, y_poly, color='pink', alpha=0.5, zorder=3, label=f'Zona de Risco (< {angulo_minimo_fabricante}°)')
-    # --- FIM DA CORREÇÃO ---
-    
     ax.plot([0, raio_max], [-torre_height * 0.5, -torre_height * 0.5], color='black', linestyle='--', linewidth=1)
     ax.text(raio_max / 2, -torre_height * 0.8, f"Raio: {raio_max:.2f} m", ha='center', fontsize=9)
-    
-    arc_radius_op = comprimento_lanca * 0.25 # Aumentar um pouco para visibilidade
+    arc_radius_op = comprimento_lanca * 0.25
     arc_op = Arc((0, torre_height), arc_radius_op * 2, arc_radius_op * 2, angle=0, theta1=0, theta2=angulo_operacao_graus, color='darkgreen', linewidth=2)
     ax.add_patch(arc_op)
     text_angle_rad_op = angulo_operacao_rad / 2
     text_x = arc_radius_op * 1.2 * np.cos(text_angle_rad_op)
     text_y = torre_height + arc_radius_op * 1.2 * np.sin(text_angle_rad_op)
     ax.text(text_x, text_y, f'{angulo_operacao_graus:.1f}°', color='darkgreen', ha='center', va='center', fontsize=12, weight='bold')
-
     ax.set_title("Diagrama Técnico da Operação de Içamento", fontsize=14)
     ax.set_xlabel("Distância Horizontal (Raio) [m]", fontsize=10)
     ax.set_ylabel("Altura Vertical [m]", fontsize=10)
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.legend(loc='upper left', fontsize=10)
-    
     ax.set_xlim(-raio_max * 0.1, raio_max * 1.1)
     ax.set_ylim(-torre_height, y_lan_end * 1.1)
-
     buf = io.BytesIO()
     fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
