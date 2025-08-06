@@ -19,84 +19,81 @@ def safe_to_numeric(value):
     return numeric_value if pd.notna(numeric_value) else 0.0
 
 def get_report_html(context):
-    """
-    Gera a string HTML completa do relatório para um layout vertical.
-    """
     dados_icamento = context["dados_icamento"]
     dados_guindauto = context["dados_guindauto"]
-
-    peso_carga_f = f"{safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
-    margem_perc_f = f"{safe_to_numeric(dados_icamento.get('Margem Segurança (%)')):.0f}"
-    peso_seguranca_f = f"{safe_to_numeric(dados_icamento.get('Peso a Considerar (kg)')) - safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
-    peso_cabos_f = f"{safe_to_numeric(dados_icamento.get('Peso Cabos (kg)')):.2f}"
-    peso_acessorios_f = f"{safe_to_numeric(dados_icamento.get('Peso Acessórios (kg)')):.2f}"
-    carga_total_f = f"{safe_to_numeric(dados_icamento.get('Carga Total (kg)')):.2f}"
-
-    utilizacao_raio = dados_icamento.get('% Utilização Raio', 'N/A')
-    utilizacao_alcance = dados_icamento.get('% Utilização Alcance', 'N/A')
-
-    conclusao_status = "APROVADA" if dados_icamento.get('Adequado') == 'TRUE' else "REPROVADA"
-
-    try:
-        util_raio_float = float(str(utilizacao_raio).replace('%', ''))
-        util_alcance_float = float(str(utilizacao_alcance).replace('%', ''))
-        limite_seguranca = "dentro dos limites de segurança de 80%" if util_raio_float <= 80 and util_alcance_float <= 80 else "excedendo o limite de segurança de 80%"
-    except (ValueError, AttributeError):
-        limite_seguranca = "com limites de segurança indeterminados"
-
+    fabricante = dados_icamento.get('fabricante_guindaste', '---')
+    nome_guindaste = dados_icamento.get('nome_guindaste', '---')
+    comp_lanca_mm = f"{safe_to_numeric(dados_icamento.get('alcance_max')) * 1000:.0f} mm"
+    raio_op_m = f"{safe_to_numeric(dados_icamento.get('raio_max')):.2f} m"
+    capacidade_carga_kg = f"{safe_to_numeric(dados_icamento.get('capacidade_raio')):.2f} Kg"
+    peso_carga_kg = f"{safe_to_numeric(dados_icamento.get('peso_carga')):.2f} Kg"
+    peso_lingada_kg = f"{safe_to_numeric(dados_icamento.get('peso_acessorios')):.2f} Kg"
+    carga_total_kg = f"{safe_to_numeric(dados_icamento.get('carga_total')):.2f} Kg"
+    perc_capacidade = dados_icamento.get('% Utilização Raio', '---')
+    
     html = f"""
     <!DOCTYPE html>
     <html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <title>Relatório de Análise de Içamento</title>
-    </head>
+    <head><meta charset="UTF-8"><title>PAME - {context['id_avaliacao']}</title></head>
     <body>
-        <div class="cover-page">
-            <h1>VIBRA ENERGIA</h1><br><br><br><br>
-            <h2>RELATÓRIO DE ANÁLISE TÉCNICA DE IÇAMENTO DE CARGA</h2>
-            <h3>ID da Avaliação: {context['id_avaliacao']}</h3>
-            <p><strong>Empresa Contratada:</strong> {dados_guindauto.get('Empresa', 'Não informado')}</p><br><br><br><br><br><br>
-            <p class="cover-footer">{context['cidade']}, {context['data_emissao']}</p>
+        <div class="report-container">
+            <header class="report-header">
+                <div class="logo-placeholder"><span class="logo-text">VIBRA</span></div>
+                <div class="title-container"><span class="main-title">PAME Manutenção e Instalações</span></div>
+                <div class="header-details">
+                    <span><strong>DATA:</strong> {context['data_emissao']}</span>
+                    <span><strong>REV:</strong> 00</span>
+                    <span><strong>FL:</strong> 1/1</span>
+                </div>
+            </header>
+            <div class="main-content">
+                <div class="left-column">
+                    <table class="data-table">
+                        <tr class="section-title"><td colspan="2">CONFIGURAÇÃO DO IÇAMENTO - LIFTING CONFIGURATION</td></tr>
+                        <tr><td class="label">Guindaste {fabricante}</td><td class="value">{nome_guindaste}</td></tr>
+                        <tr><td class="label">COMP. LANÇA / BOOM LENGTH</td><td class="value">{comp_lanca_mm}</td></tr>
+                        <tr><td class="label">RAIO DE OPERAÇÃO / RADIUS</td><td class="value">{raio_op_m}</td></tr>
+                        <tr><td class="label">CAPACIDADE DE CARGA / CAPACITY</td><td class="value">{capacidade_carga_kg}</td></tr>
+                        <tr><td class="label">PESO DA CARGA / MAX LOAD</td><td class="value">{peso_carga_kg}</td></tr>
+                        <tr><td class="label">PESO DO MOITÃO / BLOCK WEIGTH</td><td class="value">---</td></tr>
+                        <tr><td class="label">PESO DA LINGADA / RIGGING WEIGTH</td><td class="value">{peso_lingada_kg}</td></tr>
+                        <tr><td class="label">PESO TOTAL / TOTAL WEIGTH</td><td class="value">{carga_total_kg}</td></tr>
+                        <tr><td class="label">% DA CAPACIDADE / PERCENTAGE</td><td class="value">{perc_capacidade}</td></tr>
+                    </table>
+                    <table class="data-table">
+                        <tr class="section-title"><td colspan="2">ESPECIFICAÇÃO DA LINGADA - RIGGING CONFIGURATION</td></tr>
+                        <tr><td class="label">ESTROPO 01</td><td class="value">---</td></tr>
+                        <tr><td class="label">ESTROPO 02</td><td class="value">---</td></tr>
+                        <tr><td class="label">BALANCIM / SPREADER BAR</td><td class="value">---</td></tr>
+                    </table>
+                    <table class="data-table">
+                        <tr class="section-title"><td colspan="2">RESPONSABILIDADES / ASSINATURA</td></tr>
+                        <tr><td class="label">ELABORADO POR: RIGGER</td><td class="value"></td></tr>
+                        <tr><td class="label">OPERADOR GUINDASTE</td><td class="value"></td></tr>
+                        <tr><td class="label">SUPERVISOR DE MONTAGEM</td><td class="value"></td></tr>
+                        <tr><td class="label">TÉC. DE SEGURANÇA</td><td class="value"></td></tr>
+                    </table>
+                </div>
+                <div class="right-column">
+                    <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
+                </div>
+            </div>
+            <footer class="report-footer">
+                <div class="footer-box">
+                    <span class="label">CLIENTE:</span>
+                    <span class="value large">VIBRA ENERGIA</span>
+                </div>
+                <div class="footer-box wide">
+                    <span class="label">TÍTULO:</span>
+                    <span class="value large">ESTUDO DE RIGGING - {context['id_avaliacao']}</span>
+                    <span class="value">PARA IÇAMENTO DE CARGA</span>
+                </div>
+                <div class="footer-box">
+                    <span class="label">LOCAL:</span>
+                    <span class="value">ROD. CASTELO BRANCO - BARUERI/SP</span>
+                </div>
+            </footer>
         </div>
-
-        <section>
-            <h1>1. INTRODUÇÃO</h1>
-            <p>Este relatório apresenta a análise técnica e a metodologia aplicada na avaliação da operação de içamento de carga, identificada pelo ID {context['id_avaliacao']}, para a empresa contratada <strong>{dados_guindauto.get('Empresa', 'Não informado')}</strong>. A elaboração deste relatório é de responsabilidade da <strong>VIBRA ENERGIA</strong>.</p>
-        </section>
-
-        <section>
-            <h1>2. DESENVOLVIMENTO</h1>
-            
-            <!-- CORREÇÃO: Removido o layout de duas colunas -->
-            <h2>2.1. Dados da Operação</h2>
-            <p>A operação foi realizada com os seguintes parâmetros principais:</p>
-            <ul>
-                <li><strong>Operador Responsável:</strong> {dados_guindauto.get('Nome Operador', 'Não informado')}</li>
-                <li><strong>Guindaste Utilizado:</strong> {dados_icamento.get('Fabricante', 'N/A')} - Modelo: {dados_icamento.get('Modelo Guindaste', 'N/A')}</li>
-                <li><strong>Placa do Veículo:</strong> {dados_guindauto.get('Placa Guindaste', 'Não informado')}</li>
-            </ul>
-
-            <h2>2.2. Metodologia de Cálculo de Carga</h2>
-            <p>A carga total da operação foi determinada pela soma do peso da carga, acessórios, cabos e uma margem de segurança. Os valores calculados foram:</p>
-            <table>
-                <tr><td>Peso da Carga</td><td>{peso_carga_f} kg</td></tr>
-                <tr><td>Margem de Segurança ({margem_perc_f}%)</td><td>{peso_seguranca_f} kg</td></tr>
-                <tr><td>Peso dos Cabos</td><td>{peso_cabos_f} kg</td></tr>
-                <tr><td>Peso dos Acessórios</td><td>{peso_acessorios_f} kg</td></tr>
-                <tr class="total-row"><td><strong>Carga Total Calculada</strong></td><td><strong>{carga_total_f} kg</strong></td></tr>
-            </table>
-            
-            <h2>2.3. Diagrama e Análise de Capacidade</h2>
-            <p>O diagrama abaixo ilustra a configuração do içamento. A análise de capacidade indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
-            <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
-        </section>
-
-        <section>
-            <h1>3. CONCLUSÃO</h1>
-            <p>Com base na análise dos dados e nos cálculos realizados, a operação foi considerada <strong>{conclusao_status}</strong>. A carga total de {carga_total_f} kg está {limite_seguranca} da capacidade do equipamento nas configurações avaliadas.</p>
-            <p>Recomenda-se que todos os procedimentos de segurança padrão sejam seguidos durante a execução da tarefa.</p>
-        </section>
     </body>
     </html>
     """
@@ -104,20 +101,39 @@ def get_report_html(context):
 
 def get_report_css():
     css = """
-    @page { size: A4; margin: 3cm 2cm 2cm 3cm; @bottom-right { content: counter(page); font-size: 12pt; } }
-    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
-    h1, h2, h3 { font-family: 'Arial', sans-serif; color: #333; font-weight: bold; text-align: left; }
-    h1 { font-size: 14pt; margin-top: 24pt; } h2 { font-size: 12pt; margin-top: 18pt; }
-    p { text-indent: 4em; margin-bottom: 12pt; } ul { list-style-position: inside; padding-left: 4em; }
-    .cover-page { page-break-after: always; text-align: center; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-    .cover-page h1, .cover-page h2, .cover-page h3, .cover-page p { text-align: center; text-indent: 0; }
-    img { max-width: 100%; display: block; margin: 10px auto; border: 1px solid #ccc; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-    td { border: 1px solid #ccc; padding: 8px; } .total-row { background-color: #f2f2f2; }
+    @page {
+        /* CORREÇÃO: Voltando para o formato paisagem (horizontal) */
+        size: A4 landscape;
+        margin: 1cm;
+    }
+    body { font-family: Arial, sans-serif; font-size: 9pt; color: #333; }
+    .report-container { border: 2px solid black; height: 98%; display: flex; flex-direction: column; }
+    .report-header { display: flex; border-bottom: 2px solid black; padding: 5px; align-items: center; }
+    .logo-placeholder { border: 1px solid #ccc; padding: 10px 20px; text-align: center; }
+    .logo-text { font-size: 18pt; font-weight: bold; }
+    .title-container { flex-grow: 1; text-align: center; font-weight: bold; font-size: 14pt; }
+    .header-details { display: flex; flex-direction: column; font-size: 8pt; text-align: right; }
+    .main-content { display: flex; flex-grow: 1; padding: 5px; gap: 5px; }
+    .left-column { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .right-column { flex: 1.2; border: 1px solid black; padding: 5px; }
+    .right-column img { width: 100%; height: 100%; object-fit: contain; }
+    .data-table { width: 100%; border-collapse: collapse; border: 1px solid black; }
+    .data-table td { border: 1px solid black; padding: 3px; vertical-align: middle; }
+    .data-table .section-title td { background-color: #e0e0e0; font-weight: bold; text-align: center; font-size: 10pt; }
+    .data-table .label { font-weight: bold; font-size: 8pt; width: 40%; }
+    .data-table .value { text-align: center; }
+    .report-footer { display: flex; border-top: 2px solid black; }
+    .footer-box { border-right: 2px solid black; padding: 5px; display: flex; flex-direction: column; flex: 1; }
+    .footer-box.wide { flex: 2; }
+    .footer-box:last-child { border-right: none; }
+    .footer-box .label { font-size: 8pt; font-weight: bold; }
+    .footer-box .value { font-size: 10pt; text-align: center; margin-top: 5px; }
+    .footer-box .value.large { font-size: 12pt; font-weight: bold; }
     """
     return css
 
 def generate_abnt_report(dados_icamento, dados_guindauto):
+    # (Esta função permanece a mesma da versão anterior, já está correta)
     raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
     alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
     angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
@@ -125,7 +141,7 @@ def generate_abnt_report(dados_icamento, dados_guindauto):
     diagrama_base64_url = generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo)
     context = {
         "id_avaliacao": dados_icamento.name, "cidade": "Barueri, SP",
-        "data_emissao": datetime.now().strftime("%d de %B de %Y"),
+        "data_emissao": datetime.now().strftime("%d/%m/%Y"),
         "dados_icamento": dados_icamento, "dados_guindauto": dados_guindauto,
         "diagrama_base64": diagrama_base64_url
     }
