@@ -1,33 +1,30 @@
 from weasyprint import HTML, CSS
 import pandas as pd
 from datetime import datetime
-from pathlib import Path
+import numpy as np
+import io
+import base64
+
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
 
 # Importar a nova função de plotagem estática de 'plot.py'
 from operations.plot import generate_static_diagram_for_pdf
 
 def safe_to_numeric(value):
-    """
-    Converte um valor para numérico de forma segura, tratando vírgulas como decimais.
-    Retorna 0.0 se a conversão falhar ou o valor for nulo.
-    """
-    if value is None:
-        return 0.0
-    # O coerce=True transforma erros de conversão em NaN (Not a Number)
+    if value is None: return 0.0
     numeric_value = pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
-    # Retorna o valor numérico ou 0.0 se for NaN
     return numeric_value if pd.notna(numeric_value) else 0.0
 
 def get_report_html(context):
     """
-    Gera a string HTML completa do relatório usando f-strings.
-    Substitui a necessidade do Jinja2.
+    Gera a string HTML completa do relatório com os textos ajustados.
     """
-    # Extrai os dicionários de dados do contexto para facilitar o uso
     dados_icamento = context["dados_icamento"]
     dados_guindauto = context["dados_guindauto"]
 
-    # Prepara valores formatados e lógicas de negócio com antecedência
     peso_carga_f = f"{safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
     margem_perc_f = f"{safe_to_numeric(dados_icamento.get('Margem Segurança (%)')):.0f}"
     peso_seguranca_f = f"{safe_to_numeric(dados_icamento.get('Peso a Considerar (kg)')) - safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
@@ -58,11 +55,15 @@ def get_report_html(context):
     <body>
         <!-- Capa do Relatório -->
         <div class="cover-page">
-            <h1>{context['empresa_contratante']}</h1>
+            <!-- CORREÇÃO 1: Nome da empresa elaboradora -->
+            <h1>VIBRA ENERGIA</h1>
             <br><br><br><br>
             <h2>RELATÓRIO DE ANÁLISE TÉCNICA DE IÇAMENTO DE CARGA</h2>
             <h3>ID da Avaliação: {context['id_avaliacao']}</h3>
+            <!-- CORREÇÃO 2: Empresa do guindaste agora é "Contratada" -->
+            <p><strong>Empresa Contratada:</strong> {dados_guindauto.get('Empresa', 'Não informado')}</p>
             <br><br><br><br><br><br>
+            <!-- CORREÇÃO 3: Cidade ajustada -->
             <p class="cover-footer">{context['cidade']}, {context['data_emissao']}</p>
         </div>
 
@@ -71,36 +72,40 @@ def get_report_html(context):
             <h1>1. INTRODUÇÃO</h1>
             <p>
                 Este relatório apresenta a análise técnica e a metodologia aplicada na avaliação da operação de
-                içamento de carga, identificada pelo ID {context['id_avaliacao']}. O objetivo deste documento é validar
-                a segurança e a conformidade dos equipamentos e procedimentos utilizados, com base nos dados
-                fornecidos e nos cálculos de engenharia realizados.
+                içamento de carga, identificada pelo ID {context['id_avaliacao']}, para a empresa contratada <strong>{dados_guindauto.get('Empresa', 'Não informado')}</strong>.
+                O objetivo deste documento é validar a segurança e a conformidade dos equipamentos e procedimentos utilizados, com base nos dados
+                fornecidos e nos cálculos de engenharia realizados. A elaboração deste relatório é de responsabilidade da <strong>VIBRA ENERGIA</strong>.
             </p>
         </section>
 
         <!-- Desenvolvimento -->
         <section>
             <h1>2. DESENVOLVIMENTO</h1>
-            <h2>2.1. Dados da Operação</h2>
-            <p>A operação foi realizada com os seguintes parâmetros principais:</p>
-            <ul>
-                <li><strong>Operador Responsável:</strong> {dados_guindauto.get('Nome Operador', 'Não informado')}</li>
-                <li><strong>Guindaste Utilizado:</strong> {dados_icamento.get('Fabricante', 'N/A')} - Modelo: {dados_icamento.get('Modelo Guindaste', 'N/A')}</li>
-                <li><strong>Placa do Veículo:</strong> {dados_guindauto.get('Placa Guindaste', 'Não informado')}</li>
-            </ul>
-
-            <h2>2.2. Metodologia de Cálculo de Carga</h2>
-            <p>A carga total da operação foi determinada pela soma do peso da carga, acessórios, cabos e uma margem de segurança. Os valores calculados foram:</p>
-            <table>
-                <tr><td>Peso da Carga</td><td>{peso_carga_f} kg</td></tr>
-                <tr><td>Margem de Segurança ({margem_perc_f}%)</td><td>{peso_seguranca_f} kg</td></tr>
-                <tr><td>Peso dos Cabos</td><td>{peso_cabos_f} kg</td></tr>
-                <tr><td>Peso dos Acessórios</td><td>{peso_acessorios_f} kg</td></tr>
-                <tr class="total-row"><td><strong>Carga Total Calculada</strong></td><td><strong>{carga_total_f} kg</strong></td></tr>
-            </table>
-            
-            <h2>2.3. Diagrama e Análise de Capacidade</h2>
-            <p>O diagrama abaixo ilustra a configuração do içamento. A análise de capacidade indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
-            <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
+            <div class="content-wrapper">
+                <div class="column-left">
+                    <h2>2.1. Dados da Operação</h2>
+                    <p>A operação foi realizada com os seguintes parâmetros principais:</p>
+                    <ul>
+                        <li><strong>Operador Responsável:</strong> {dados_guindauto.get('Nome Operador', 'Não informado')}</li>
+                        <li><strong>Guindaste Utilizado:</strong> {dados_icamento.get('Fabricante', 'N/A')} - Modelo: {dados_icamento.get('Modelo Guindaste', 'N/A')}</li>
+                        <li><strong>Placa do Veículo:</strong> {dados_guindauto.get('Placa Guindaste', 'Não informado')}</li>
+                    </ul>
+                    <h2>2.2. Metodologia de Cálculo de Carga</h2>
+                    <p>A carga total da operação foi determinada pela soma do peso da carga, acessórios, cabos e uma margem de segurança. Os valores calculados foram:</p>
+                    <table>
+                        <tr><td>Peso da Carga</td><td>{peso_carga_f} kg</td></tr>
+                        <tr><td>Margem de Segurança ({margem_perc_f}%)</td><td>{peso_seguranca_f} kg</td></tr>
+                        <tr><td>Peso dos Cabos</td><td>{peso_cabos_f} kg</td></tr>
+                        <tr><td>Peso dos Acessórios</td><td>{peso_acessorios_f} kg</td></tr>
+                        <tr class="total-row"><td><strong>Carga Total Calculada</strong></td><td><strong>{carga_total_f} kg</strong></td></tr>
+                    </table>
+                </div>
+                <div class="column-right">
+                    <h2>2.3. Diagrama e Análise de Capacidade</h2>
+                    <p>O diagrama abaixo ilustra a configuração do içamento. A análise de capacidade indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
+                    <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
+                </div>
+            </div>
         </section>
 
         <!-- Conclusão -->
@@ -119,49 +124,20 @@ def get_report_html(context):
     return html
 
 def get_report_css():
-    """
-    Retorna a string CSS com estilos inspirados na ABNT para o relatório.
-    """
+    # (Esta função permanece a mesma da versão paisagem)
     css = """
-    @page {
-        size: A4;
-        margin: 3cm 2cm 2cm 3cm; /* Margens ABNT: Superior, Direita, Inferior, Esquerda */
-        @bottom-right {
-            content: counter(page);
-            font-family: 'Times New Roman', serif;
-            font-size: 12pt;
-        }
-    }
-    body {
-        font-family: 'Times New Roman', serif;
-        font-size: 12pt;
-        line-height: 1.5;
-        text-align: justify;
-    }
-    h1, h2, h3 {
-        font-family: 'Arial', sans-serif;
-        color: #333;
-        font-weight: bold;
-        text-align: left;
-    }
-    h1 { font-size: 14pt; margin-top: 24pt; }
-    h2 { font-size: 12pt; margin-top: 18pt; }
-    p { text-indent: 4em; margin-bottom: 12pt; }
-    ul { list-style-position: inside; padding-left: 4em; }
-    .cover-page {
-        page-break-after: always;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        height: 100%;
-    }
-    .cover-page h1, .cover-page h2, .cover-page h3 { text-align: center; }
-    .cover-footer { text-indent: 0; margin-top: auto; }
-    img { max-width: 100%; display: block; margin: 20px auto; border: 1px solid #ccc; }
+    @page { size: A4 landscape; margin: 2cm; @bottom-right { content: counter(page); font-family: 'Times New Roman', serif; font-size: 12pt; } }
+    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; text-align: justify; }
+    h1, h2, h3 { font-family: 'Arial', sans-serif; color: #333; font-weight: bold; text-align: left; }
+    h1 { font-size: 14pt; margin-top: 24pt; } h2 { font-size: 12pt; margin-top: 18pt; }
+    p { text-indent: 4em; margin-bottom: 12pt; } ul { list-style-position: inside; padding-left: 4em; }
+    .cover-page { page-break-after: always; text-align: center; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+    .cover-page h1, .cover-page h2, .cover-page h3 { text-align: center; } .cover-footer { text-indent: 0; margin-top: auto; }
+    img { max-width: 100%; display: block; margin: 10px auto; border: 1px solid #ccc; }
     table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-    td { border: 1px solid #ccc; padding: 8px; }
-    .total-row { background-color: #f2f2f2; }
+    td { border: 1px solid #ccc; padding: 8px; } .total-row { background-color: #f2f2f2; }
+    .content-wrapper { display: flex; flex-direction: row; gap: 20px; }
+    .column-left { flex: 1; } .column-right { flex: 1.5; }
     """
     return css
 
@@ -169,32 +145,27 @@ def generate_abnt_report(dados_icamento, dados_guindauto):
     """
     Função principal que orquestra a geração do relatório PDF em formato ABNT.
     """
-    # 1. Obter dados para o diagrama a partir da planilha de içamento
     raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
     alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
     angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
     if pd.isna(angulo_minimo):
         angulo_minimo = 40.0
 
-    # Chamar a função do Matplotlib para gerar a imagem estática do diagrama
     diagrama_base64_url = generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo)
 
-    # 2. Montar o dicionário de contexto com todos os dados necessários para o relatório
+    # CORREÇÃO 3: Cidade ajustada no contexto
     context = {
-        "empresa_contratante": dados_guindauto.get('Empresa', 'NOME DA SUA EMPRESA'),
-        "id_avaliacao": dados_icamento.name, # .name pega o índice da série, que é o ID
-        "cidade": "Sua Cidade", # Pode ser um campo do formulário no futuro
+        "id_avaliacao": dados_icamento.name,
+        "cidade": "Barueri, SP",
         "data_emissao": datetime.now().strftime("%d de %B de %Y"),
         "dados_icamento": dados_icamento,
         "dados_guindauto": dados_guindauto,
         "diagrama_base64": diagrama_base64_url
     }
 
-    # 3. Obter as strings de HTML e CSS das funções auxiliares
     html_string = get_report_html(context)
     css_string = get_report_css()
 
-    # 4. Usar WeasyPrint para gerar o PDF a partir das strings
     css = CSS(string=css_string)
     pdf_bytes = HTML(string=html_string).write_pdf(stylesheets=[css])
 
