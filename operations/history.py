@@ -4,6 +4,7 @@ from datetime import datetime, date
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from operations.plot import criar_diagrama_guindaste
+from operations.report_generator import generate_abnt_report
 
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
@@ -131,6 +132,22 @@ def show_history_page():
             dados_icamento = result_lifting.iloc[0]
             dados_guindauto = result_crane.iloc[0]
             st.header(f"Análise Detalhada da Avaliação: {search_id}")
+            
+            st.markdown("---")
+            with st.spinner("Gerando relatório PDF..."):
+                # Gerar o relatório em memória
+                pdf_report = generate_abnt_report(dados_icamento, dados_guindauto)
+                
+                # Criar o botão de download
+                st.download_button(
+                    label="📄 Baixar Relatório ABNT (PDF)",
+                    data=pdf_report,
+                    file_name=f"Relatorio_Içamento_{search_id}.pdf",
+                    mime="application/pdf"
+                )
+            st.markdown("---")
+
+            
             col1, col2 = st.columns([2, 1])
             with col1:
                 render_diagrama(dados_icamento)
@@ -172,5 +189,6 @@ def show_history_page():
             st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
