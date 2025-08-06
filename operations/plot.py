@@ -1,5 +1,71 @@
 import plotly.graph_objects as go
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
+import io
+import base64
+
+def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabricante):
+    """
+    Cria um diagrama estático usando Matplotlib, ideal para PDFs.
+    """
+    # Cálculos
+    comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
+    angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
+    angulo_operacao_graus = np.degrees(angulo_operacao_rad)
+    angulo_min_rad = np.radians(angulo_minimo_fabricante)
+
+    # Criação da Figura
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.set_aspect('equal', adjustable='box')
+
+    # Base e Torre do Guindaste
+    ax.fill([-2, 2, 2, -2], [-1, -1, 0, 0], color='lightgray', zorder=1)
+    ax.plot([0, 0], [0, 2], color='dimgray', linewidth=8, zorder=2)
+
+    # Zona de Risco
+    theta_risco = np.linspace(0, angulo_min_rad, 50)
+    x_risco = comprimento_lanca * np.cos(theta_risco)
+    y_risco = 2 + comprimento_lanca * np.sin(theta_risco)
+    ax.fill_between(x_risco, 2, y_risco, color='crimson', alpha=0.15, zorder=3, label=f'Zona de Risco (< {angulo_minimo_fabricante}°)')
+
+    # Lança
+    cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
+    ax.plot([0, raio_max], [2, alcance_max + 2], color=cor_lanca, linewidth=6, zorder=4, label='Lança de Operação')
+
+    # Linhas de Raio e Altura
+    ax.plot([0, raio_max], [-0.5, -0.5], color='black', linestyle='--', linewidth=1)
+    ax.text(raio_max / 2, -0.7, f"Raio: {raio_max:.2f} m", ha='center')
+
+    # Arco do Ângulo
+    arc_radius = comprimento_lanca * 0.2
+    arc = Arc((0, 2), arc_radius, arc_radius, angle=0, theta1=0, theta2=angulo_operacao_graus, color='darkgreen', linewidth=2, label=f'{angulo_operacao_graus:.1f}°')
+    ax.add_patch(arc)
+    ax.text(arc_radius * np.cos(angulo_operacao_rad/2) * 1.1, 2 + arc_radius * np.sin(angulo_operacao_rad/2) * 1.1, f'{angulo_operacao_graus:.1f}°', color='darkgreen', ha='center')
+
+    # Configurações do Gráfico
+    ax.set_title("Diagrama Técnico da Operação de Içamento")
+    ax.set_xlabel("Distância Horizontal (Raio) [m]")
+    ax.set_ylabel("Altura Vertical [m]")
+    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend(loc='upper left')
+
+    # Limites
+    ax.set_xlim(-5, max(raio_max, 10) * 1.1)
+    ax.set_ylim(-2, max(alcance_max + 2, 10) * 1.1)
+
+    # Salvar a figura em um buffer de memória
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig) # Fechar a figura para liberar memória
+
+    # Converter para base64
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return f"data:image/png;base64,{img_base64}"
+
+
+
 
 def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo_fabricante):
     """
