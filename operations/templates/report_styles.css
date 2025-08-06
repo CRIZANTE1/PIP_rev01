@@ -1,0 +1,83 @@
+/* Configurações da página e fontes ABNT */
+@page {
+    size: A4;
+    margin: 3cm 2cm 2cm 3cm; /* Superior, Direita, Inferior, Esquerda */
+
+    @bottom-right {
+        content: counter(page);
+        font-family: 'Times New Roman', serif;
+        font-size: 12pt;
+    }
+}
+
+body {
+    font-family: 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    text-align: justify;
+}
+
+h1, h2, h3 {
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    font-weight: bold;
+    text-align: left;
+}
+
+h1 {
+    font-size: 14pt;
+    margin-top: 24pt;
+}
+
+h2 {
+    font-size: 12pt;
+    margin-top: 18pt;
+}
+
+p {
+    text-indent: 4em; /* Parágrafo ABNT */
+    margin-bottom: 12pt;
+}
+
+/* Estilos da Capa */
+.cover-page {
+    page-break-after: always; /* Pula para a próxima página após a capa */
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+
+.cover-page h1, .cover-page h2, .cover-page h3 {
+    text-align: center;
+}
+
+.cover-footer {
+    text-indent: 0;
+    margin-top: auto;
+}
+
+/* Outros elementos */
+img {
+    max-width: 100%;
+    display: block;
+    margin: 20px auto;
+    border: 1px solid #ccc;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+td {
+    border: 1px solid #ccc;
+    padding: 8px;
+}
+
+.total-row {
+    background-color: #f2f2f2;
+}
