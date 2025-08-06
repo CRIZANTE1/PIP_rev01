@@ -1,210 +1,164 @@
-from weasyprint import HTML, CSS
-import pandas as pd
-from datetime import datetime
-from pathlib import Path
+import plotly.graph_objects as go
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Arc
+import io
+import base64
 
-# Importar a função de plotagem estática de 'plot.py'
-from operations.plot import generate_static_diagram_for_pdf
-
-def safe_to_numeric(value):
+def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo_fabricante):
     """
-    Converte um valor para numérico de forma segura, tratando vírgulas como decimais.
-    Retorna 0.0 se a conversão falhar ou o valor for nulo.
+    CORREÇÃO v2: Cria um diagrama técnico do guindaste com Plotly, com cálculos trigonométricos corretos.
     """
-    if value is None:
-        return 0.0
-    numeric_value = pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
-    return numeric_value if pd.notna(numeric_value) else 0.0
+    fig = go.Figure()
 
-def get_report_html(context):
-    """
-    Gera a string HTML completa do relatório usando f-strings.
-    """
-    dados_icamento = context["dados_icamento"]
-    dados_guindauto = context["dados_guindauto"]
+    if not all([raio_max > 0, alcance_max > 0]):
+        fig.update_layout(title="Dados insuficientes para gerar o diagrama")
+        return fig
 
-    peso_carga_f = f"{safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
-    margem_perc_f = f"{safe_to_numeric(dados_icamento.get('Margem Segurança (%)')):.0f}"
-    peso_seguranca_f = f"{safe_to_numeric(dados_icamento.get('Peso a Considerar (kg)')) - safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
-    peso_cabos_f = f"{safe_to_numeric(dados_icamento.get('Peso Cabos (kg)')):.2f}"
-    peso_acessorios_f = f"{safe_to_numeric(dados_icamento.get('Peso Acessórios (kg)')):.2f}"
-    carga_total_f = f"{safe_to_numeric(dados_icamento.get('Carga Total (kg)')):.2f}"
+    # Cálculos da operação ATUAL
+    angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
+    angulo_operacao_graus = np.degrees(angulo_operacao_rad)
 
-    utilizacao_raio = dados_icamento.get('% Utilização Raio', 'N/A')
-    utilizacao_alcance = dados_icamento.get('% Utilização Alcance', 'N/A')
+    # Cálculos para a ZONA DE RISCO (baseado no ângulo mínimo)
+    # CORREÇÃO: Usar o ângulo mínimo fornecido para desenhar a zona de risco
+    angulo_min_rad = np.radians(angulo_minimo_fabricante)
 
-    conclusao_status = "APROVADA" if dados_icamento.get('Adequado') == 'TRUE' else "REPROVADA"
-
-    try:
-        util_raio_float = float(str(utilizacao_raio).replace('%', ''))
-        util_alcance_float = float(str(utilizacao_alcance).replace('%', ''))
-        limite_seguranca = "dentro dos limites de segurança de 80%" if util_raio_float <= 80 and util_alcance_float <= 80 else "excedendo o limite de segurança de 80%"
-    except (ValueError, AttributeError):
-        limite_seguranca = "com limites de segurança indeterminados"
-
-    html = f"""
-    <!DOCTYPE html>
-    <html lang="pt-br">
-    <head>
-        <meta charset="UTF-8">
-        <title>Relatório de Análise de Içamento</title>
-    </head>
-    <body>
-        <!-- Capa do Relatório -->
-        <div class="cover-page">
-            <!-- CORREÇÃO: Nome da empresa elaboradora definido -->
-            <h1>VIBRA ENERGIA</h1>
-            <br><br><br><br>
-            <h2>RELATÓRIO DE ANÁLISE TÉCNICA DE IÇAMENTO DE CARGA</h2>
-            <h3>ID da Avaliação: {context['id_avaliacao']}</h3>
-            <p><strong>Empresa Contratante:</strong> {dados_guindauto.get('Empresa', 'Não informado')}</p>
-            <br><br><br><br><br><br>
-            <p class="cover-footer">{context['cidade']}, {context['data_emissao']}</p>
-        </div>
-
-        <!-- Introdução -->
-        <section>
-            <h1>1. INTRODUÇÃO</h1>
-            <p>
-                Este relatório apresenta a análise técnica e a metodologia aplicada na avaliação da operação de
-                içamento de carga, identificada pelo ID {context['id_avaliacao']}. O objetivo deste documento é validar
-                a segurança e a conformidade dos equipamentos e procedimentos utilizados, com base nos dados
-                fornecidos e nos cálculos de engenharia realizados. A elaboração deste relatório é de responsabilidade da VIBRA ENERGIA.
-            </p>
-        </section>
-
-        <!-- Desenvolvimento -->
-        <section>
-            <h1>2. DESENVOLVIMENTO</h1>
-            <div class="content-wrapper">
-                <div class="column-left">
-                    <h2>2.1. Dados da Operação</h2>
-                    <p>A operação foi realizada com os seguintes parâmetros principais:</p>
-                    <ul>
-                        <li><strong>Operador Responsável:</strong> {dados_guindauto.get('Nome Operador', 'Não informado')}</li>
-                        <li><strong>Guindaste Utilizado:</strong> {dados_icamento.get('Fabricante', 'N/A')} - Modelo: {dados_icamento.get('Modelo Guindaste', 'N/A')}</li>
-                        <li><strong>Placa do Veículo:</strong> {dados_guindauto.get('Placa Guindaste', 'Não informado')}</li>
-                    </ul>
-
-                    <h2>2.2. Metodologia de Cálculo de Carga</h2>
-                    <p>A carga total da operação foi determinada pela soma do peso da carga, acessórios, cabos e uma margem de segurança. Os valores calculados foram:</p>
-                    <table>
-                        <tr><td>Peso da Carga</td><td>{peso_carga_f} kg</td></tr>
-                        <tr><td>Margem de Segurança ({margem_perc_f}%)</td><td>{peso_seguranca_f} kg</td></tr>
-                        <tr><td>Peso dos Cabos</td><td>{peso_cabos_f} kg</td></tr>
-                        <tr><td>Peso dos Acessórios</td><td>{peso_acessorios_f} kg</td></tr>
-                        <tr class="total-row"><td><strong>Carga Total Calculada</strong></td><td><strong>{carga_total_f} kg</strong></td></tr>
-                    </table>
-                </div>
-                <div class="column-right">
-                    <h2>2.3. Diagrama e Análise de Capacidade</h2>
-                    <p>O diagrama abaixo ilustra a configuração do içamento. A análise de capacidade indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
-                    <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
-                </div>
-            </div>
-        </section>
-
-        <!-- Conclusão -->
-        <section>
-            <h1>3. CONCLUSÃO</h1>
-            <p>
-                Com base na análise dos dados e nos cálculos realizados, a operação foi considerada
-                <strong>{conclusao_status}</strong>.
-                A carga total de {carga_total_f} kg está {limite_seguranca} da capacidade do equipamento nas configurações avaliadas.
-            </p>
-            <p>Recomenda-se que todos os procedimentos de segurança padrão sejam seguidos durante a execução da tarefa.</p>
-        </section>
-    </body>
-    </html>
-    """
-    return html
-
-def get_report_css():
-    """
-    Retorna a string CSS com estilos ABNT para o relatório.
-    """
-    css = """
-    @page {
-        /* CORREÇÃO: Orientação da página definida para paisagem */
-        size: A4 landscape;
-        margin: 2cm 2cm 2cm 2cm; /* Margens ajustadas para paisagem */
-        @bottom-right {
-            content: counter(page);
-            font-family: 'Times New Roman', serif;
-            font-size: 12pt;
-        }
-    }
-    body {
-        font-family: 'Times New Roman', serif;
-        font-size: 12pt;
-        line-height: 1.5;
-        text-align: justify;
-    }
-    h1, h2, h3 {
-        font-family: 'Arial', sans-serif;
-        color: #333;
-        font-weight: bold;
-        text-align: left;
-    }
-    h1 { font-size: 14pt; margin-top: 24pt; }
-    h2 { font-size: 12pt; margin-top: 18pt; }
-    p { text-indent: 4em; margin-bottom: 12pt; }
-    ul { list-style-position: inside; padding-left: 4em; }
-    .cover-page {
-        page-break-after: always;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        height: 100%;
-    }
-    .cover-page h1, .cover-page h2, .cover-page h3 { text-align: center; }
-    .cover-footer { text-indent: 0; margin-top: auto; }
-    img { max-width: 100%; display: block; margin: 10px auto; border: 1px solid #ccc; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
-    td { border: 1px solid #ccc; padding: 8px; }
-    .total-row { background-color: #f2f2f2; }
+    # Base e Torre Proporcionais
+    base_width = max(4, raio_max * 0.05)
+    torre_height = max(2, alcance_max * 0.05)
     
-    /* Layout de duas colunas para a seção de desenvolvimento */
-    .content-wrapper {
-        display: flex;
-        flex-direction: row;
-        gap: 20px;
-    }
-    .column-left {
-        flex: 1;
-    }
-    .column-right {
-        flex: 1.5; /* Coluna do gráfico um pouco maior */
-    }
+    # Base e Torre do Guindaste
+    fig.add_trace(go.Scatter(x=[-base_width/2, base_width/2, base_width/2, -base_width/2, -base_width/2], y=[-torre_height/2, -torre_height/2, 0, 0, -torre_height/2], mode='lines', name='Base', line=dict(color='darkgray', width=4), fill='toself', fillcolor='lightgray', hoverinfo='none'))
+    fig.add_trace(go.Scatter(x=[0, 0], y=[0, torre_height], mode='lines', name='Torre', line=dict(color='dimgray', width=8), hoverinfo='none'))
+
+    # Lança de Operação
+    y_lan_end = torre_height + alcance_max
+    cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
+    comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2) # Comprimento real da lança nesta operação
+    fig.add_trace(go.Scatter(
+        x=[0, raio_max], y=[torre_height, y_lan_end],
+        mode='lines+markers', name='Lança de Operação',
+        line=dict(color=cor_lanca, width=10),
+        marker=dict(symbol='circle', size=8, color=cor_lanca),
+        hovertemplate=f"<b>Lança de Operação</b><br>Comprimento: {comprimento_lanca:.2f} m<br>Ângulo: {angulo_operacao_graus:.2f}°<extra></extra>"
+    ))
+
+    # Zona de Risco
+    # CORREÇÃO: O raio do arco da zona de risco deve ser grande o suficiente para ser visível
+    raio_risco = max(raio_max, alcance_max) * 1.2
+    theta_risco = np.linspace(0, angulo_min_rad, 50)
+    x_risco = raio_risco * np.cos(theta_risco)
+    y_risco = torre_height + raio_risco * np.sin(theta_risco)
+    fig.add_trace(go.Scatter(
+        x=np.concatenate([[0], x_risco, [0]]),
+        y=np.concatenate([[torre_height], y_risco, [torre_height]]),
+        mode='lines', fill='toself', fillcolor='rgba(220, 20, 60, 0.15)',
+        line=dict(color='rgba(220, 20, 60, 0.3)'),
+        name=f'Zona de Risco (< {angulo_minimo_fabricante}°)',
+        hoverinfo='none'
+    ))
+
+    # Anotações e Arco do Ângulo da OPERAÇÃO
+    fig.add_shape(type="line", x0=0, y0=-torre_height*0.5, x1=raio_max, y1=-torre_height*0.5, line=dict(color="black", width=1, dash="dash"))
+    fig.add_annotation(x=raio_max/2, y=-torre_height*0.5, text=f"<b>Raio: {raio_max:.2f} m</b>", showarrow=False, yshift=-10)
+    
+    # CORREÇÃO: O raio do arco do ângulo deve ser proporcional ao COMPRIMENTO DA LANÇA
+    arc_radius_op = comprimento_lanca * 0.2
+    theta_arco_op = np.linspace(0, angulo_operacao_rad, 50)
+    x_arco_op = arc_radius_op * np.cos(theta_arco_op)
+    y_arco_op = torre_height + arc_radius_op * np.sin(theta_arco_op)
+    fig.add_trace(go.Scatter(x=x_arco_op, y=y_arco_op, mode='lines', line=dict(color='darkgreen', width=2), hoverinfo='none', showlegend=False))
+    text_angle_rad_op = angulo_operacao_rad / 2
+    fig.add_annotation(
+        x=arc_radius_op * 1.15 * np.cos(text_angle_rad_op),
+        y=torre_height + arc_radius_op * 1.15 * np.sin(text_angle_rad_op),
+        text=f"<b>{angulo_operacao_graus:.1f}°</b>",
+        showarrow=False, font=dict(color='darkgreen', size=14)
+    )
+
+    # Ponto de Içamento
+    fig.add_trace(go.Scatter(x=[raio_max], y=[y_lan_end], mode='markers', name='Ponto de Içamento', marker=dict(symbol='circle-open', size=15, color='darkorange', line=dict(width=3)), hovertemplate=f"<b>Carga Total: {carga_total:,.2f} kg</b><br>Capacidade no Raio: {capacidade_raio:,.2f} kg<extra></extra>"))
+
+    # Layout Final
+    fig.update_layout(
+        title=dict(text="<b>Diagrama Técnico da Operação de Içamento</b>", font=dict(size=20), x=0.5),
+        xaxis_title="Distância Horizontal (Raio) [m]", yaxis_title="Altura Vertical [m]",
+        showlegend=True, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        xaxis=dict(range=[-raio_max * 0.1, raio_max * 1.1], gridcolor='lightgrey'),
+        yaxis=dict(range=[-torre_height, y_lan_end * 1.1], scaleanchor="x", scaleratio=1, gridcolor='lightgrey'),
+        margin=dict(l=80, r=40, t=80, b=80), hovermode='closest', plot_bgcolor='white'
+    )
+    return fig
+
+
+def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabricante):
     """
-    return css
-
-def generate_abnt_report(dados_icamento, dados_guindauto):
+    CORREÇÃO v3: Cria um diagrama estático com Matplotlib, com a lógica de preenchimento correta.
     """
-    Função principal que orquestra a geração do relatório PDF em formato ABNT.
-    """
-    raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
-    alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
-    angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
-    if pd.isna(angulo_minimo):
-        angulo_minimo = 40.0
+    # Cálculos
+    angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
+    angulo_operacao_graus = np.degrees(angulo_operacao_rad)
+    angulo_min_rad = np.radians(angulo_minimo_fabricante)
+    comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
 
-    diagrama_base64_url = generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo)
+    # Criação da Figura
+    fig, ax = plt.subplots(figsize=(10, 8))
+    ax.set_aspect('equal', adjustable='box')
 
-    context = {
-        "id_avaliacao": dados_icamento.name,
-        "cidade": "Sua Cidade",
-        "data_emissao": datetime.now().strftime("%d de %B de %Y"),
-        "dados_icamento": dados_icamento,
-        "dados_guindauto": dados_guindauto,
-        "diagrama_base64": diagrama_base64_url
-    }
+    # Base e Torre Proporcionais
+    base_width = max(4, raio_max * 0.05)
+    torre_height = max(2, alcance_max * 0.05)
+    ax.fill([-base_width/2, base_width/2, base_width/2, -base_width/2], [-torre_height/2, -torre_height/2, 0, 0], color='lightgray', zorder=1)
+    ax.plot([0, 0], [0, torre_height], color='dimgray', linewidth=8, zorder=2)
 
-    html_string = get_report_html(context)
-    css_string = get_report_css()
+    # Lança de Operação
+    y_lan_end = torre_height + alcance_max
+    cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
+    ax.plot([0, raio_max], [torre_height, y_lan_end], color=cor_lanca, linewidth=6, zorder=4, label='Lança de Operação')
 
-    css = CSS(string=css_string)
-    pdf_bytes = HTML(string=html_string).write_pdf(stylesheets=[css])
+    # --- CORREÇÃO DA ZONA DE RISCO ---
+    # 1. Definir um raio grande para o arco da zona de risco ser visível
+    raio_risco = max(raio_max, alcance_max) * 1.2 
+    
+    # 2. Calcular os pontos ao longo do arco do ângulo mínimo
+    theta_risco = np.linspace(0, angulo_min_rad, 50)
+    x_risco_arc = raio_risco * np.cos(theta_risco)
+    y_risco_arc = torre_height + raio_risco * np.sin(theta_risco)
 
-    return pdf_bytes
+    # 3. Construir as coordenadas do polígono fechado para preenchimento
+    x_poly = np.concatenate([[0], x_risco_arc])
+    y_poly = np.concatenate([[torre_height], y_risco_arc])
+    
+    # 4. Usar ax.fill() para preencher o polígono
+    ax.fill(x_poly, y_poly, color='crimson', alpha=0.15, zorder=3, label=f'Zona de Risco (< {angulo_minimo_fabricante}°)')
+    # --- FIM DA CORREÇÃO ---
+
+    # Anotações e Arco do Ângulo da OPERAÇÃO
+    ax.plot([0, raio_max], [-torre_height * 0.5, -torre_height * 0.5], color='black', linestyle='--', linewidth=1)
+    ax.text(raio_max / 2, -torre_height * 0.8, f"Raio: {raio_max:.2f} m", ha='center', fontsize=9)
+    
+    arc_radius_op = comprimento_lanca * 0.2
+    arc_op = Arc((0, torre_height), arc_radius_op * 2, arc_radius_op * 2, angle=0, theta1=0, theta2=angulo_operacao_graus, color='darkgreen', linewidth=2)
+    ax.add_patch(arc_op)
+    text_angle_rad_op = angulo_operacao_rad / 2
+    text_x = arc_radius_op * 1.15 * np.cos(text_angle_rad_op)
+    text_y = torre_height + arc_radius_op * 1.15 * np.sin(text_angle_rad_op)
+    ax.text(text_x, text_y, f'{angulo_operacao_graus:.1f}°', color='darkgreen', ha='center', va='center', fontsize=10, weight='bold')
+
+    # Configurações do Gráfico
+    ax.set_title("Diagrama Técnico da Operação de Içamento", fontsize=14)
+    ax.set_xlabel("Distância Horizontal (Raio) [m]", fontsize=10)
+    ax.set_ylabel("Altura Vertical [m]", fontsize=10)
+    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend(loc='upper left', fontsize=8)
+    
+    ax.set_xlim(-raio_max * 0.1, raio_max * 1.1)
+    ax.set_ylim(-torre_height, y_lan_end * 1.1)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
+    buf.seek(0)
+    plt.close(fig)
+
+    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return f"data:image/png;base64,{img_base64}"
