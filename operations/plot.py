@@ -91,21 +91,21 @@ def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio
     return fig
 
 
-# --- FUNÇÃO PARA GERAR GRÁFICO ESTÁTICO (PDF) ---
 def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabricante):
     """
-    CORREÇÃO v2: Cria um diagrama estático usando Matplotlib, com cálculos trigonométricos corretos.
+    CORREÇÃO v3: Cria um diagrama estático com Matplotlib, com a lógica de preenchimento correta.
     """
-    # Cálculos da operação ATUAL
+    # Cálculos
     angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
     angulo_operacao_graus = np.degrees(angulo_operacao_rad)
-
-    # Cálculos para a ZONA DE RISCO (baseado no ângulo mínimo)
     angulo_min_rad = np.radians(angulo_minimo_fabricante)
+    comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
 
+    # Criação da Figura
     fig, ax = plt.subplots(figsize=(10, 8))
     ax.set_aspect('equal', adjustable='box')
 
+    # Base e Torre Proporcionais
     base_width = max(4, raio_max * 0.05)
     torre_height = max(2, alcance_max * 0.05)
     ax.fill([-base_width/2, base_width/2, base_width/2, -base_width/2], [-torre_height/2, -torre_height/2, 0, 0], color='lightgray', zorder=1)
@@ -114,25 +114,31 @@ def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabrica
     # Lança de Operação
     y_lan_end = torre_height + alcance_max
     cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
-    comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
     ax.plot([0, raio_max], [torre_height, y_lan_end], color=cor_lanca, linewidth=6, zorder=4, label='Lança de Operação')
 
-    # Zona de Risco
-    # CORREÇÃO: O raio do arco da zona de risco deve ser grande o suficiente para ser visível
-    raio_risco = max(raio_max, alcance_max) * 1.2
+    # --- CORREÇÃO DA ZONA DE RISCO ---
+    # 1. Definir um raio grande para o arco da zona de risco ser visível
+    raio_risco = max(raio_max, alcance_max) * 1.2 
+    
+    # 2. Calcular os pontos ao longo do arco do ângulo mínimo
     theta_risco = np.linspace(0, angulo_min_rad, 50)
-    x_risco = raio_risco * np.cos(theta_risco)
-    y_risco = torre_height + raio_risco * np.sin(theta_risco)
-    ax.fill_betweenx(y_risco, 0, x_risco, where=x_risco > 0, color='crimson', alpha=0.15, zorder=3)
-    ax.plot(x_risco, y_risco, color='red', linestyle='--', linewidth=1, label=f'Limite de Risco ({angulo_minimo_fabricante}°)')
+    x_risco_arc = raio_risco * np.cos(theta_risco)
+    y_risco_arc = torre_height + raio_risco * np.sin(theta_risco)
+
+    # 3. Construir as coordenadas do polígono fechado para preenchimento
+    x_poly = np.concatenate([[0], x_risco_arc])
+    y_poly = np.concatenate([[torre_height], y_risco_arc])
+    
+    # 4. Usar ax.fill() para preencher o polígono
+    ax.fill(x_poly, y_poly, color='crimson', alpha=0.15, zorder=3, label=f'Zona de Risco (< {angulo_minimo_fabricante}°)')
+    # --- FIM DA CORREÇÃO ---
 
     # Anotações e Arco do Ângulo da OPERAÇÃO
     ax.plot([0, raio_max], [-torre_height * 0.5, -torre_height * 0.5], color='black', linestyle='--', linewidth=1)
     ax.text(raio_max / 2, -torre_height * 0.8, f"Raio: {raio_max:.2f} m", ha='center', fontsize=9)
     
-    # CORREÇÃO: O raio do arco do ângulo deve ser proporcional ao COMPRIMENTO DA LANÇA
     arc_radius_op = comprimento_lanca * 0.2
-    arc_op = Arc((0, torre_height), arc_radius_op * 2, arc_radius_op * 2, angle=0, theta1=0, theta2=angulo_operacao_graus, color='darkgreen', linewidth=2, label=f'{angulo_operacao_graus:.1f}°')
+    arc_op = Arc((0, torre_height), arc_radius_op * 2, arc_radius_op * 2, angle=0, theta1=0, theta2=angulo_operacao_graus, color='darkgreen', linewidth=2)
     ax.add_patch(arc_op)
     text_angle_rad_op = angulo_operacao_rad / 2
     text_x = arc_radius_op * 1.15 * np.cos(text_angle_rad_op)
