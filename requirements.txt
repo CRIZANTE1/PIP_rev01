@@ -13,5 +13,5 @@ google-auth
 requests
 weasyprint
 reportlab
-jinja2 
-kaleido
+orca      
+psutil
