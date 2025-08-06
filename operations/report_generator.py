@@ -1,48 +1,53 @@
 from weasyprint import HTML, CSS
 import pandas as pd
 from datetime import datetime
-import base64
 from pathlib import Path
 
-import plotly.io as pio
-from operations.plot import criar_diagrama_guindaste
-
-pio.orca.config.executable = 'orca'
-pio.orca.config.use_xvfb = True
+# Importar a nova função de plotagem estática de 'plot.py'
+from operations.plot import generate_static_diagram_for_pdf
 
 def safe_to_numeric(value):
-    """Converte um valor para numérico de forma segura, tratando vírgulas."""
-    if value is None: return 0.0
-    return pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
+    """
+    Converte um valor para numérico de forma segura, tratando vírgulas como decimais.
+    Retorna 0.0 se a conversão falhar ou o valor for nulo.
+    """
+    if value is None:
+        return 0.0
+    # O coerce=True transforma erros de conversão em NaN (Not a Number)
+    numeric_value = pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
+    # Retorna o valor numérico ou 0.0 se for NaN
+    return numeric_value if pd.notna(numeric_value) else 0.0
 
 def get_report_html(context):
     """
-    Gera a string HTML do relatório usando f-strings, em vez de Jinja2.
+    Gera a string HTML completa do relatório usando f-strings.
+    Substitui a necessidade do Jinja2.
     """
-    # Extrai os dados do contexto para facilitar o uso nas f-strings
+    # Extrai os dicionários de dados do contexto para facilitar o uso
     dados_icamento = context["dados_icamento"]
     dados_guindauto = context["dados_guindauto"]
-    
-    # Prepara valores formatados para evitar lógica complexa no HTML
+
+    # Prepara valores formatados e lógicas de negócio com antecedência
     peso_carga_f = f"{safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
     margem_perc_f = f"{safe_to_numeric(dados_icamento.get('Margem Segurança (%)')):.0f}"
     peso_seguranca_f = f"{safe_to_numeric(dados_icamento.get('Peso a Considerar (kg)')) - safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
     peso_cabos_f = f"{safe_to_numeric(dados_icamento.get('Peso Cabos (kg)')):.2f}"
     peso_acessorios_f = f"{safe_to_numeric(dados_icamento.get('Peso Acessórios (kg)')):.2f}"
     carga_total_f = f"{safe_to_numeric(dados_icamento.get('Carga Total (kg)')):.2f}"
-    
+
     utilizacao_raio = dados_icamento.get('% Utilização Raio', 'N/A')
     utilizacao_alcance = dados_icamento.get('% Utilização Alcance', 'N/A')
-    
+
     conclusao_status = "APROVADA" if dados_icamento.get('Adequado') == 'TRUE' else "REPROVADA"
-    
+
     try:
-        util_raio_float = float(utilizacao_raio.replace('%', ''))
-        util_alcance_float = float(utilizacao_alcance.replace('%', ''))
+        util_raio_float = float(str(utilizacao_raio).replace('%', ''))
+        util_alcance_float = float(str(utilizacao_alcance).replace('%', ''))
         limite_seguranca = "dentro dos limites de segurança de 80%" if util_raio_float <= 80 and util_alcance_float <= 80 else "excedendo o limite de segurança de 80%"
     except (ValueError, AttributeError):
         limite_seguranca = "com limites de segurança indeterminados"
 
+    # String HTML principal
     html = f"""
     <!DOCTYPE html>
     <html lang="pt-br">
@@ -94,7 +99,7 @@ def get_report_html(context):
             </table>
             
             <h2>2.3. Diagrama e Análise de Capacidade</h2>
-            <p>O diagrama abaixo ilustra a configuração do içamento, demonstrando a relação entre raio, alcance e a zona de segurança operacional do equipamento. A análise de capacidade do guindaste indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
+            <p>O diagrama abaixo ilustra a configuração do içamento. A análise de capacidade indicou uma utilização de {utilizacao_raio} no raio máximo e {utilizacao_alcance} no alcance máximo.</p>
             <img src="{context['diagrama_base64']}" alt="Diagrama de Içamento">
         </section>
 
@@ -115,12 +120,12 @@ def get_report_html(context):
 
 def get_report_css():
     """
-    Retorna a string CSS para o relatório.
+    Retorna a string CSS com estilos inspirados na ABNT para o relatório.
     """
     css = """
     @page {
         size: A4;
-        margin: 3cm 2cm 2cm 3cm;
+        margin: 3cm 2cm 2cm 3cm; /* Margens ABNT: Superior, Direita, Inferior, Esquerda */
         @bottom-right {
             content: counter(page);
             font-family: 'Times New Roman', serif;
@@ -142,6 +147,7 @@ def get_report_css():
     h1 { font-size: 14pt; margin-top: 24pt; }
     h2 { font-size: 12pt; margin-top: 18pt; }
     p { text-indent: 4em; margin-bottom: 12pt; }
+    ul { list-style-position: inside; padding-left: 4em; }
     .cover-page {
         page-break-after: always;
         text-align: center;
@@ -161,38 +167,34 @@ def get_report_css():
 
 def generate_abnt_report(dados_icamento, dados_guindauto):
     """
-    Gera um relatório PDF em formato ABNT sem usar Jinja2.
+    Função principal que orquestra a geração do relatório PDF em formato ABNT.
     """
-    # 1. Gerar a imagem do diagrama
+    # 1. Obter dados para o diagrama a partir da planilha de içamento
     raio_max = safe_to_numeric(dados_icamento.get('Raio Máximo (m)'))
     alcance_max = safe_to_numeric(dados_icamento.get('Alcance Máximo (m)'))
-    carga_total = safe_to_numeric(dados_icamento.get('Carga Total (kg)'))
-    capacidade_raio = safe_to_numeric(dados_icamento.get('Capacidade Raio (kg)'))
     angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
     if pd.isna(angulo_minimo):
         angulo_minimo = 40.0
-        
-    fig = criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo)
-    img_bytes = fig.to_image(format="png", scale=2)
-    img_base64 = base64.b64encode(img_bytes).decode("utf-8")
-    diagrama_base64_url = f"data:image/png;base64,{img_base64}"
 
-    # 2. Montar o contexto
+    # Chamar a função do Matplotlib para gerar a imagem estática do diagrama
+    diagrama_base64_url = generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo)
+
+    # 2. Montar o dicionário de contexto com todos os dados necessários para o relatório
     context = {
         "empresa_contratante": dados_guindauto.get('Empresa', 'NOME DA SUA EMPRESA'),
-        "id_avaliacao": dados_icamento.name,
-        "cidade": "Sua Cidade",
+        "id_avaliacao": dados_icamento.name, # .name pega o índice da série, que é o ID
+        "cidade": "Sua Cidade", # Pode ser um campo do formulário no futuro
         "data_emissao": datetime.now().strftime("%d de %B de %Y"),
         "dados_icamento": dados_icamento,
         "dados_guindauto": dados_guindauto,
         "diagrama_base64": diagrama_base64_url
     }
-    
-    # 3. Gerar HTML e CSS
+
+    # 3. Obter as strings de HTML e CSS das funções auxiliares
     html_string = get_report_html(context)
     css_string = get_report_css()
-    
-    # 4. Gerar o PDF
+
+    # 4. Usar WeasyPrint para gerar o PDF a partir das strings
     css = CSS(string=css_string)
     pdf_bytes = HTML(string=html_string).write_pdf(stylesheets=[css])
 
