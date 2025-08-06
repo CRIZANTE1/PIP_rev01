@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
 from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from operations.plot import criar_diagrama_guindaste
@@ -12,7 +12,9 @@ def load_sheet_data(sheet_name):
     try:
         uploader = GoogleDriveUploader()
         data = uploader.get_data_from_sheet(sheet_name)
-        if not data or len(data) < 2: return pd.DataFrame()
+        if not data or len(data) < 2: 
+            st.warning(f"A planilha '{sheet_name}' está vazia ou não foi encontrada.")
+            return pd.DataFrame()
         headers, rows = data[0], data[1:]
         max_cols = len(headers)
         cleaned_rows = [row[:max_cols] + [None] * (max_cols - len(row)) for row in rows]
@@ -21,18 +23,11 @@ def load_sheet_data(sheet_name):
         st.error(f"Erro ao carregar dados da planilha '{sheet_name}': {e}")
         return pd.DataFrame()
 
-def make_urls_clickable(df):
-    """Transforma colunas de URL em links HTML."""
-    for col in df.columns:
-        if "URL" in col.upper() or "LINK" in col.upper():
-            df[col] = df[col].apply(lambda x: f'<a href="{x}" target="_blank">Abrir Link</a>' if pd.notna(x) and str(x).startswith('http') else "N/A")
-    return df
+# CORREÇÃO: A função make_urls_clickable não é mais necessária e foi removida.
 
 def get_status_from_date(date_str):
     """Calcula o status (Válido/Vencido) a partir de uma string de data."""
-    if not date_str or not isinstance(date_str, str):
-        return "Status Indeterminado"
-    
+    if not date_str or not isinstance(date_str, str): return "Status Indeterminado"
     today = datetime.now().date()
     try:
         expiry_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -41,36 +36,26 @@ def get_status_from_date(date_str):
             expiry_date = datetime.strptime(date_str, '%d/%m/%Y').date()
         except ValueError:
             return "Data em formato inválido"
-
-    if expiry_date >= today:
-        return "Válido"
-    else:
-        return "Vencido"
+    return "Válido" if expiry_date >= today else "Vencido"
 
 def render_document_status(dados_guindauto):
-    """Renderiza a lista de documentos calculando o status em tempo real a partir das datas na planilha."""
+    """Renderiza a lista de documentos calculando o status em tempo real."""
     st.subheader("Documentos Avaliados")
-
-    # CORREÇÃO: Removida a verificação de data para a "Certificação NR-11"
     doc_map = {
         "ART (Anot. Resp. Técnica)": {"url_col": "URL ART", "date_col": "Validade ART"},
-        "Certificação NR-11":        {"url_col": "URL Certificado", "date_col": None}, 
+        "Certificação NR-11":        {"url_col": "URL NR-11", "date_col": None},
         "CNH do Operador":           {"url_col": "URL CNH", "date_col": "Validade CNH"},
         "Manutenção Preventiva":     {"url_col": "URL M_PREV", "date_col": "Próxima Manutenção"},
         "CRLV do Veículo":           {"url_col": "URL CRLV", "date_col": None},
         "Gráfico de Carga":          {"url_col": "URL Gráfico de Carga", "date_col": None}
     }
-
     for doc_name, cols in doc_map.items():
         url = dados_guindauto.get(cols["url_col"])
-        
         if pd.notna(url) and str(url).strip().startswith('http'):
             link = f"<a href='{url}' target='_blank'>Abrir Documento</a>"
-            
             if cols["date_col"]:
                 date_value = dados_guindauto.get(cols["date_col"])
                 status = get_status_from_date(date_value)
-                
                 if "Válido" in status:
                     st.markdown(f"✅ **{doc_name}**: {status} - {link}", unsafe_allow_html=True)
                 else:
@@ -94,22 +79,18 @@ def render_diagrama(dados_icamento):
         carga_total = safe_to_numeric(dados_icamento.get('Carga Total (kg)'))
         capacidade_raio = safe_to_numeric(dados_icamento.get('Capacidade Raio (kg)'))
         angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
-
         if pd.isna(angulo_minimo):
             angulo_minimo = 40.0
             st.info("Ângulo mínimo da lança não informado. Adotando 40° como padrão para o diagrama.")
-
         if all(pd.notna([raio_max, alcance_max, carga_total, capacidade_raio])):
             fig = criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo)
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("Não foi possível gerar o diagrama. Verifique se os campos de Raio, Alcance e Capacidades estão preenchidos no registro.")
-    
     except Exception as e:
         st.error(f"Ocorreu um erro ao renderizar o diagrama: {e}")
 
 def show_history_page():
-    # O restante da função permanece inalterado.
     st.title("Histórico de Avaliações")
     st.info("Os dados são atualizados a cada 10 minutos. Para forçar a atualização, limpe o cache.")
     if st.button("Limpar Cache e Recarregar Dados"):
@@ -119,9 +100,11 @@ def show_history_page():
         df_lifting = load_sheet_data(LIFTING_SHEET_NAME)
         df_crane = load_sheet_data(CRANE_SHEET_NAME)
     if df_lifting.empty or df_crane.empty:
-        st.warning("Não foi possível carregar os dados do histórico. Verifique se ambas as planilhas (içamento e guindauto) estão preenchidas.")
+        st.warning("Não foi possível carregar os dados do histórico. Verifique se ambas as planilhas estão preenchidas.")
         return
+
     st.subheader("Buscar e Analisar Avaliação por ID")
+    # ... (o bloco de busca por ID permanece o mesmo)
     id_column = df_lifting.columns[0]
     search_id = st.text_input("Digite o ID da Avaliação (ex: AV20240101-abcdefgh)", key="search_id_input")
     if st.button("Buscar por ID", key="search_button") and search_id:
@@ -131,14 +114,10 @@ def show_history_page():
         if not result_lifting.empty and not result_crane.empty:
             dados_icamento = result_lifting.iloc[0]
             dados_guindauto = result_crane.iloc[0]
-            st.header(f"Análise Detalhada da Avaliação: {search_id}")
             
             st.markdown("---")
             with st.spinner("Gerando relatório PDF..."):
-                # Gerar o relatório em memória
                 pdf_report = generate_abnt_report(dados_icamento, dados_guindauto)
-                
-                # Criar o botão de download
                 st.download_button(
                     label="📄 Baixar Relatório ABNT (PDF)",
                     data=pdf_report,
@@ -147,7 +126,7 @@ def show_history_page():
                 )
             st.markdown("---")
 
-            
+            st.header(f"Análise Detalhada da Avaliação: {search_id}")
             col1, col2 = st.columns([2, 1])
             with col1:
                 render_diagrama(dados_icamento)
@@ -171,22 +150,38 @@ def show_history_page():
                 st.subheader("Dados de Içamento")
                 st.dataframe(result_lifting.T, use_container_width=True)
                 st.subheader("Informações do Guindauto")
-                result_crane_clickable = make_urls_clickable(result_crane.copy())
-                st.markdown(result_crane_clickable.T.to_html(escape=False), unsafe_allow_html=True)
+                st.dataframe(result_crane.set_index(result_crane.columns[0]).T, use_container_width=True) # Exibição transposta melhorada
         else:
-            st.warning(f"Nenhum registro completo encontrado para o ID: {search_id}. Verifique se o ID está correto e se há dados em ambas as planilhas.")
+            st.warning(f"Nenhum registro completo encontrado para o ID: {search_id}.")
+
     st.markdown("---")
     st.subheader("Histórico Completo (Visão Geral)")
+    
     tab1, tab2 = st.tabs(["Dados de Içamento", "Informações do Guindauto"])
+
     with tab1:
         if not df_lifting.empty:
             st.dataframe(df_lifting, use_container_width=True)
         else:
             st.info("Nenhum histórico de dados de içamento encontrado.")
+
     with tab2:
         if not df_crane.empty:
-            df_crane_clickable = make_urls_clickable(df_crane.copy())
-            st.markdown(df_crane_clickable.to_html(escape=False, index=False), unsafe_allow_html=True)
+            
+            column_config = {}
+            for col_name in df_crane.columns:
+                if "URL" in col_name.upper():
+                    column_config[col_name] = st.column_config.LinkColumn(
+                        "Link do Documento",
+                        display_text="Abrir ↗"  
+                    )
+            
+            st.dataframe(
+                df_crane,
+                use_container_width=True,
+                column_config=column_config,
+                hide_index=True,
+            )
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
 
