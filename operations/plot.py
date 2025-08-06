@@ -92,7 +92,6 @@ def criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio
 
 
 def generate_static_diagram_for_pdf(raio_max, alcance_max, angulo_minimo_fabricante):
-    # (Esta função permanece a mesma da versão anterior, já está correta)
     fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_aspect('equal', adjustable='box')
     angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
