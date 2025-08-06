@@ -4,10 +4,12 @@ from datetime import datetime
 import base64
 from pathlib import Path
 
-# Importar o Plotly IO para interagir com a exportação de imagens
 import plotly.io as pio
 from operations.plot import criar_diagrama_guindaste
 
+
+pio.templates.default = "plotly_white" # Define um template padrão para consistência
+pio.kaleido.scope.default_engine = "orca" # A linha mais importante!
 
 def safe_to_numeric(value):
     """
@@ -16,34 +18,30 @@ def safe_to_numeric(value):
     """
     if value is None:
         return 0.0
-    # O coerce=True transforma erros de conversão em NaN (Not a Number), que é mais seguro
     numeric_value = pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
-    # Retorna o valor numérico ou 0.0 se for NaN
     return numeric_value if pd.notna(numeric_value) else 0.0
 
 
 def get_report_html(context):
     """
     Gera a string HTML completa do relatório usando f-strings.
-    Esta função substitui a necessidade do Jinja2.
     """
-    # Extrai os dicionários de dados do contexto para facilitar o uso nas f-strings
+    # (Esta função não precisa de alterações, o código dela permanece o mesmo)
     dados_icamento = context["dados_icamento"]
     dados_guindauto = context["dados_guindauto"]
-
-    # Prepara valores formatados e lógicas de negócio com antecedência para limpar o HTML
+    
     peso_carga_f = f"{safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
     margem_perc_f = f"{safe_to_numeric(dados_icamento.get('Margem Segurança (%)')):.0f}"
     peso_seguranca_f = f"{safe_to_numeric(dados_icamento.get('Peso a Considerar (kg)')) - safe_to_numeric(dados_icamento.get('Peso Carga (kg)')):.2f}"
     peso_cabos_f = f"{safe_to_numeric(dados_icamento.get('Peso Cabos (kg)')):.2f}"
     peso_acessorios_f = f"{safe_to_numeric(dados_icamento.get('Peso Acessórios (kg)')):.2f}"
     carga_total_f = f"{safe_to_numeric(dados_icamento.get('Carga Total (kg)')):.2f}"
-
+    
     utilizacao_raio = dados_icamento.get('% Utilização Raio', 'N/A')
     utilizacao_alcance = dados_icamento.get('% Utilização Alcance', 'N/A')
-
+    
     conclusao_status = "APROVADA" if dados_icamento.get('Adequado') == 'TRUE' else "REPROVADA"
-
+    
     try:
         util_raio_float = float(str(utilizacao_raio).replace('%', ''))
         util_alcance_float = float(str(utilizacao_alcance).replace('%', ''))
@@ -126,6 +124,7 @@ def get_report_css():
     """
     Retorna a string CSS com estilos inspirados na ABNT para o relatório.
     """
+    # (Esta função não precisa de alterações, o código dela permanece o mesmo)
     css = """
     @page {
         size: A4;
@@ -185,8 +184,8 @@ def generate_abnt_report(dados_icamento, dados_guindauto):
 
     fig = criar_diagrama_guindaste(raio_max, alcance_max, carga_total, capacidade_raio, angulo_minimo)
 
-    # Exportar para bytes, especificando EXPLICITAMENTE a engine 'orca'
-    img_bytes = fig.to_image(format="png", scale=2, engine="orca")
+    # A chamada agora não precisa mais do parâmetro 'engine', pois o padrão foi sobrescrito
+    img_bytes = fig.to_image(format="png", scale=2)
 
     # Converter a imagem para base64 para embutir no HTML
     img_base64 = base64.b64encode(img_bytes).decode("utf-8")
@@ -195,7 +194,7 @@ def generate_abnt_report(dados_icamento, dados_guindauto):
     # 2. Montar o dicionário de contexto com todos os dados necessários para o relatório
     context = {
         "empresa_contratante": dados_guindauto.get('Empresa', 'NOME DA SUA EMPRESA'),
-        "id_avaliacao": dados_icamento.name, # .name pega o índice (ID da avaliação)
+        "id_avaliacao": dados_icamento.name,
         "cidade": "Sua Cidade",
         "data_emissao": datetime.now().strftime("%d de %B de %Y"),
         "dados_icamento": dados_icamento,
