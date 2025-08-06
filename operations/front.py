@@ -7,7 +7,6 @@ from datetime import datetime, date
 import time
 import logging
 
-
 from operations.plot import criar_diagrama_guindaste
 from operations.calc import calcular_carga_total, validar_guindaste
 from gdrive.gdrive_upload import GoogleDriveUploader
@@ -15,9 +14,7 @@ from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from AI.api_Operation import PDFQA
 from utils.prompts import get_crlv_prompt, get_art_prompt, get_cnh_prompt, get_nr11_prompt, get_mprev_prompt
 
-
 logging.basicConfig(level=logging.INFO)
-
 
 def mostrar_instrucoes():
     with st.expander("📖 Como usar este aplicativo", expanded=False):
@@ -56,18 +53,19 @@ def mostrar_instrucoes():
         6. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
         """)
 
-
 def gerar_id_avaliacao():
     return f"AV{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
 
 def handle_upload_with_id(uploader, arquivo, tipo_doc, id_avaliacao):
     if arquivo is None: return None
-    extensao = arquivo.name.split('.')[-1]; novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
+    extensao = arquivo.name.split('.')[-1]
+    novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
     try:
         file_url = uploader.upload_file(arquivo, novo_nome)
         return {'success': True, 'url': file_url, 'nome': novo_nome}
     except Exception as e:
-        st.error(f"Erro no upload de '{novo_nome}': {e}"); return {'success': False, 'error': str(e)}
+        st.error(f"Erro no upload de '{novo_nome}': {e}")
+        return {'success': False, 'error': str(e)}
 
 def display_status(status_text):
     if not status_text: return
@@ -80,20 +78,20 @@ def display_status(status_text):
         st.warning(f"Status: {status_text}")
 
 def front_page():
+    # Inicialização do session_state para todos os campos do formulário
     form_keys = [
         'empresa_form', 'cnpj_form', 'telefone_form', 'email_form', 
         'operador_form', 'cpf_form', 'cnh_form', 'cnh_validade_form', 'cnh_status', 
         'placa_form', 'modelo_form', 'fabricante_form', 'ano_form', 
         'art_num_form', 'art_validade_form', 'art_status', 'obs_form', 
         'nr11_modulo_form', 'nr11_validade_form', 'nr11_status',
-        'mprev_data_form', 'mprev_prox_form', 'mprev_status','final_analysis_report'
+        'mprev_data_form', 'mprev_prox_form', 'mprev_status'
     ]
     for key in form_keys:
         if key not in st.session_state: st.session_state[key] = ""
     
     if 'id_avaliacao' not in st.session_state: st.session_state.id_avaliacao = gerar_id_avaliacao()
     if 'dados_icamento' not in st.session_state: st.session_state.dados_icamento = {}
-    if 'uploads' not in st.session_state: st.session_state.uploads = {}
     
     st.title("Calculadora de Movimentação de Carga")
     mostrar_instrucoes()
@@ -102,20 +100,26 @@ def front_page():
 
     # --- ABA 1: CÁLCULO DE IÇAMENTO ---
     with tab1:
-        col1_estado, col2_estado = st.columns(2)
+        col1_estado, _ = st.columns(2)
         with col1_estado:
             estado_equipamento = st.radio("Estado do Equipamento", ["Novo", "Usado"], key="estado_equip_radio", help="Novo: 10% de margem. Usado: 25%.")
         if estado_equipamento == "Novo": st.info("Margem de segurança aplicada: 10%")
         else: st.warning("Margem de segurança aplicada: 25%")
+
         with st.form("formulario_carga"):
-            col1, col2 = st.columns(2);
+            col1, col2 = st.columns(2)
             with col1:
+                st.subheader("Dados da Carga")
                 peso_carga = st.number_input("Peso da carga (kg)", min_value=0.1, step=100.0)
                 peso_acessorios = st.number_input("Peso dos acessórios (kg)", min_value=0.0, step=1.0)
             with col2:
+                st.subheader("Dados do Guindaste")
                 fabricante_guindaste_calc = st.text_input("Fabricante do Guindaste")
-                modelo_guindaste_calc = st.text_input("Modelo do Guindaste")
-            st.subheader("Capacidades do Guindaste"); col3, col4 = st.columns(2);
+                nome_guindaste_calc = st.text_input("Nome do Guindaste (Ex: AGI, XCA250 BR II)")
+                modelo_guindaste_calc = st.text_input("Modelo do Guindaste (Opcional)")
+                
+            st.subheader("Capacidades do Guindaste")
+            col3, col4 = st.columns(2)
             with col3:
                 raio_max = st.number_input("Raio Máximo (m)", min_value=0.1, step=0.1)
                 capacidade_raio = st.number_input("Capacidade no Raio Máximo (kg)", min_value=0.1, step=100.0)
@@ -123,9 +127,11 @@ def front_page():
                 alcance_max = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
                 capacidade_alcance = st.number_input("Capacidade na Lança Máxima (kg)", min_value=0.1, step=100.0)
                 angulo_minimo_fabricante = st.number_input("Ângulo Mínimo da Lança (°)", min_value=1.0, max_value=89.0, value=40.0)
+            
             if st.form_submit_button("Calcular"):
                 try:
                     resultado = calcular_carga_total(peso_carga, estado_equipamento=="Novo", peso_acessorios)
+                    
                     st.session_state.dados_icamento = {
                         **resultado,
                         'fabricante_guindaste': fabricante_guindaste_calc,
@@ -137,33 +143,56 @@ def front_page():
                         'capacidade_alcance': capacidade_alcance,
                         'angulo_minimo_fabricante': angulo_minimo_fabricante
                     }
+                    
                     validacao = validar_guindaste(resultado['carga_total'], capacidade_raio, capacidade_alcance, raio_max, alcance_max)
                     st.session_state.dados_icamento['validacao'] = validacao
                     st.success("Cálculo realizado. Verifique os resultados abaixo.")
-                except Exception as e: st.error(f"Erro no cálculo: {e}")
-
+                except Exception as e:
+                    st.error(f"Erro no cálculo: {e}")
         
         if st.session_state.dados_icamento:
-            res = st.session_state.dados_icamento; val = res.get('validacao', {})
-            st.subheader("📊 Resultados do Cálculo"); st.table(pd.DataFrame({'Descrição': ['Peso da carga', 'Margem (%)', 'Peso Segurança', 'Peso a Considerar', 'Peso Cabos (3%)', 'Peso Acessórios', 'CARGA TOTAL'], 'Valor (kg)': [f"{res.get(k, 0):.2f}" for k in ['peso_carga', 'margem_seguranca_percentual', 'peso_seguranca', 'peso_considerar', 'peso_cabos', 'peso_acessorios']] + [f"**{res.get('carga_total', 0):.2f}**"]}))
-            st.subheader("🎯 Resultado da Validação"); 
-            if val.get('adequado'): st.success(f"✅ {val.get('mensagem')}")
-            else: st.error(f"⚠️ {val.get('mensagem', 'Falha na validação.')}")
-            c1, c2 = st.columns(2); c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%"); c2.metric("Utilização na Lança", f"{val.get('detalhes', {}).get('porcentagem_alcance', 0):.1f}%")
+            res = st.session_state.dados_icamento
+            val = res.get('validacao', {})
+            st.subheader("📊 Resultados do Cálculo")
+            st.table(pd.DataFrame({
+                'Descrição': ['Peso da carga', 'Margem (%)', 'Peso Segurança', 'Peso a Considerar', 'Peso Cabos (3%)', 'Peso Acessórios', 'CARGA TOTAL'],
+                'Valor (kg)': [
+                    f"{res.get('peso_carga', 0):.2f}",
+                    f"{res.get('margem_seguranca_percentual', 0):.2f}",
+                    f"{res.get('peso_seguranca', 0):.2f}",
+                    f"{res.get('peso_considerar', 0):.2f}",
+                    f"{res.get('peso_cabos', 0):.2f}",
+                    f"{res.get('peso_acessorios', 0):.2f}",
+                    f"**{res.get('carga_total', 0):.2f}**"
+                ]
+            }))
+            st.subheader("🎯 Resultado da Validação")
+            if val.get('adequado'):
+                st.success(f"✅ {val.get('mensagem')}")
+            else:
+                st.error(f"⚠️ {val.get('mensagem', 'Falha na validação.')}")
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%")
+            c2.metric("Utilização na Lança", f"{val.get('detalhes', {}).get('porcentagem_alcance', 0):.1f}%")
+            
             st.plotly_chart(criar_diagrama_guindaste(res['raio_max'], res['alcance_max'], res['carga_total'], res['capacidade_raio'], res['angulo_minimo_fabricante']), use_container_width=True)
 
+    # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
         st.header("Informações e Documentos do Guindauto")
         st.info(f"ID da Avaliação: **{st.session_state.id_avaliacao}**")
         
-        uploader = GoogleDriveUploader(); ai_processor = PDFQA()
+        uploader = GoogleDriveUploader()
+        ai_processor = PDFQA()
         
-        st.subheader("📋 Dados da Empresa"); col_c1, col_c2 = st.columns(2)
+        st.subheader("📋 Dados da Empresa")
+        col_c1, col_c2 = st.columns(2)
         with col_c1: st.text_input("Empresa", key="empresa_form"); st.text_input("CNPJ", key="cnpj_form")
         with col_c2: st.text_input("Telefone", key="telefone_form"); st.text_input("Email", key="email_form")
 
-        st.subheader("👤 Dados do Operador"); 
-        cnh_doc_file = st.file_uploader("1. Upload da CNH (.pdf, .png)", key="cnh_doc_file")
+        st.subheader("👤 Dados do Operador")
+        st.file_uploader("1. Upload da CNH (.pdf, .png)", key="cnh_doc_file")
         if st.session_state.cnh_doc_file and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
             extracted = ai_processor.extract_structured_data(st.session_state.cnh_doc_file, get_cnh_prompt())
             if extracted:
@@ -177,8 +206,8 @@ def front_page():
         with col_op2: st.text_input("Nº da CNH", key="cnh_form", disabled=True); st.text_input("Validade CNH", key="cnh_validade_form", disabled=True)
         display_status(st.session_state.cnh_status)
 
-        st.subheader("🏗️ Dados do Equipamento"); 
-        crlv_file = st.file_uploader("Upload do CRLV (.pdf)", key="crlv_file")
+        st.subheader("🏗️ Dados do Equipamento")
+        st.file_uploader("Upload do CRLV (.pdf)", key="crlv_file")
         if st.session_state.crlv_file and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
             extracted = ai_processor.extract_structured_data(st.session_state.crlv_file, get_crlv_prompt())
             if extracted: 
@@ -189,10 +218,11 @@ def front_page():
         with col_e1: st.text_input("Placa", key="placa_form"); st.text_input("Modelo", key="modelo_form")
         with col_e2: st.text_input("Fabricante", key="fabricante_form"); st.text_input("Ano", key="ano_form")
 
-        st.subheader("📄 Documentação e Validades"); col_d1, col_d2, col_d3 = st.columns(3)
+        st.subheader("📄 Documentação e Validades")
+        col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
-            st.markdown("**ART**"); 
-            art_file = st.file_uploader("Doc. ART (.pdf)", key="art_file") 
+            st.markdown("**ART**")
+            st.file_uploader("Doc. ART (.pdf)", key="art_file") 
             if st.session_state.art_file and st.button("Verificar ART", key="art_button"):
                  extracted = ai_processor.extract_structured_data(st.session_state.art_file, get_art_prompt())
                  if extracted: 
@@ -201,8 +231,8 @@ def front_page():
                     st.session_state.art_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Nº ART", key="art_num_form"); st.text_input("Validade ART", key="art_validade_form", disabled=True); display_status(st.session_state.art_status)
         with col_d2:
-            st.markdown("**Certificado NR-11**"); 
-            nr11_file = st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_file") 
+            st.markdown("**Certificação NR-11**")
+            st.file_uploader("Cert. NR-11 (.pdf)", key="nr11_file") 
             if st.session_state.nr11_file and st.button("Verificar NR-11", key="nr11_button"): 
                 extracted = ai_processor.extract_structured_data(st.session_state.nr11_file, get_nr11_prompt())
                 if extracted:
@@ -214,8 +244,8 @@ def front_page():
             st.selectbox("Módulo NR-11", options=modulos_nr11, key="nr11_modulo_form")
             st.text_input("Validade NR-11", key="nr11_validade_form", disabled=True); display_status(st.session_state.nr11_status)
         with col_d3:
-            st.markdown("**Manutenção (M_PREV)**"); 
-            mprev_file = st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_file") 
+            st.markdown("**Manutenção (M_PREV)**")
+            st.file_uploader("Doc. M_PREV (.pdf)", key="mprev_file") 
             if st.session_state.mprev_file and st.button("Verificar Manutenção", key="mprev_button"): 
                 extracted = ai_processor.extract_structured_data(st.session_state.mprev_file, get_mprev_prompt())
                 if extracted: 
@@ -224,8 +254,8 @@ def front_page():
                     st.session_state.mprev_status = extracted.get('status', 'Falha na verificação')
             st.text_input("Última Manutenção", key="mprev_data_form", disabled=True); st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True); display_status(st.session_state.mprev_status)
         
-        st.subheader("Upload de Gráfico de Carga"); 
-        grafico_carga_file = st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_carga_file", label_visibility="collapsed") 
+        st.subheader("Upload de Gráfico de Carga")
+        st.file_uploader("Gráfico de Carga (.pdf, .png)", key="grafico_carga_file", label_visibility="collapsed") 
         st.text_area("Observações Adicionais", key="obs_form")
         
         st.divider()
@@ -233,19 +263,22 @@ def front_page():
         col_s1, col_s2 = st.columns(2)
         with col_s1:
             if st.button("💾 Salvar Todas as Informações", type="primary", use_container_width=True):
-                if not st.session_state.dados_icamento: st.error("Calcule os dados de içamento na Aba 1 primeiro.")
+                if not st.session_state.dados_icamento:
+                    st.error("Calcule os dados de içamento na Aba 1 primeiro.")
                 else:
                     with st.spinner("Realizando upload de arquivos e salvando dados..."):
-                        id_avaliacao = st.session_state.id_avaliacao; uploads = {}
+                        id_avaliacao = st.session_state.id_avaliacao
+                        uploads = {}
                         
-                        if st.session_state.cnh_doc_file: uploads['cnh_doc'] = handle_upload_with_id(uploader, st.session_state.cnh_doc_file, 'cnh_doc', id_avaliacao)
-                        if st.session_state.crlv_file: uploads['crlv'] = handle_upload_with_id(uploader, st.session_state.crlv_file, 'crlv', id_avaliacao)
-                        if st.session_state.art_file: uploads['art_doc'] = handle_upload_with_id(uploader, st.session_state.art_file, 'art_doc', id_avaliacao)
-                        if st.session_state.nr11_file: uploads['nr11_doc'] = handle_upload_with_id(uploader, st.session_state.nr11_file, 'nr11_doc', id_avaliacao)
-                        if st.session_state.mprev_file: uploads['mprev_doc'] = handle_upload_with_id(uploader, st.session_state.mprev_file, 'mprev_doc', id_avaliacao)
-                        if st.session_state.grafico_carga_file: uploads['grafico_doc'] = handle_upload_with_id(uploader, st.session_state.grafico_carga_file, 'grafico_doc', id_avaliacao)
+                        # Upload dos arquivos
+                        if st.session_state.get('cnh_doc_file'): uploads['cnh_doc'] = handle_upload_with_id(uploader, st.session_state.cnh_doc_file, 'cnh_doc', id_avaliacao)
+                        if st.session_state.get('crlv_file'): uploads['crlv'] = handle_upload_with_id(uploader, st.session_state.crlv_file, 'crlv', id_avaliacao)
+                        if st.session_state.get('art_file'): uploads['art_doc'] = handle_upload_with_id(uploader, st.session_state.art_file, 'art_doc', id_avaliacao)
+                        if st.session_state.get('nr11_file'): uploads['nr11_doc'] = handle_upload_with_id(uploader, st.session_state.nr11_file, 'nr11_doc', id_avaliacao)
+                        if st.session_state.get('mprev_file'): uploads['mprev_doc'] = handle_upload_with_id(uploader, st.session_state.mprev_file, 'mprev_doc', id_avaliacao)
+                        if st.session_state.get('grafico_carga_file'): uploads['grafico_doc'] = handle_upload_with_id(uploader, st.session_state.grafico_carga_file, 'grafico_doc', id_avaliacao)
                         
-                        get_url = lambda key: uploads.get(key, {}).get('url', '') if uploads.get(key) else ''
+                        get_url = lambda key: uploads.get(key, {}).get('url', '')
                         
                         dados_guindauto_row = [
                             id_avaliacao, st.session_state.empresa_form, st.session_state.cnpj_form, st.session_state.telefone_form, st.session_state.email_form,
@@ -256,7 +289,11 @@ def front_page():
                             get_url('art_doc'), get_url('nr11_doc'), get_url('cnh_doc'), get_url('crlv'), get_url('mprev_doc'), get_url('grafico_doc')
                         ]
                         
-                        d_icamento = st.session_state.dados_icamento; v_icamento = d_icamento.get('validacao', {}); det_icamento = v_icamento.get('detalhes', {})
+                        d_icamento = st.session_state.dados_icamento
+                        v_icamento = d_icamento.get('validacao', {})
+                        det_icamento = v_icamento.get('detalhes', {})
+                        
+                        # Ordem corrigida para corresponder à planilha
                         dados_icamento_row = [
                             id_avaliacao,
                             datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -280,18 +317,26 @@ def front_page():
                         ]
 
                         try:
-                            uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row); uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
+                            uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row)
+                            uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
                             st.success(f"✅ Operação registrada com ID: {id_avaliacao}")
                             
-                            keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
-                            for key in keys_to_clear: del st.session_state[key]
-                            time.sleep(2); st.rerun()
-                        except Exception as e: st.error(f"Erro ao salvar nos registros: {e}")
+                            # Limpeza da sessão
+                            keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or '_file' in k or 'id_avaliacao' in k or 'dados_icamento' in k or 'status' in k]
+                            for key in keys_to_clear:
+                                del st.session_state[key]
+                            time.sleep(2)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao salvar nos registros: {e}")
         with col_s2:
             if st.button("🔄 Limpar Formulário", use_container_width=True):
-                keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or 'file' in k or 'id_avaliacao' in k or 'dados_icamento' in k]
-                for key in keys_to_clear: del st.session_state[key]
-                st.warning("⚠️ Formulário limpo."); st.rerun()
+                keys_to_clear = [k for k in st.session_state.keys() if 'form' in k or '_file' in k or 'id_avaliacao' in k or 'dados_icamento' in k or 'status' in k]
+                for key in keys_to_clear:
+                    del st.session_state[key]
+                st.warning("⚠️ Formulário limpo.")
+                st.rerun()
+
 
 
 
