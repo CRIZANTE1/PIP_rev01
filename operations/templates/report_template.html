@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório de Análise de Içamento</title>
+    <link rel="stylesheet" href="report_styles.css">
+</head>
+<body>
+    <!-- Capa do Relatório -->
+    <div class="cover-page">
+        <h1>{{ empresa_contratante }}</h1>
+        <br><br><br><br>
+        <h2>RELATÓRIO DE ANÁLISE TÉCNICA DE IÇAMENTO DE CARGA</h2>
+        <h3>ID da Avaliação: {{ id_avaliacao }}</h3>
+        <br><br><br><br><br><br>
+        <p class="cover-footer">{{ cidade }}, {{ data_emissao }}</p>
+    </div>
+
+    <!-- Introdução -->
+    <section>
+        <h1>1. INTRODUÇÃO</h1>
+        <p>
+            Este relatório apresenta a análise técnica e a metodologia aplicada na avaliação da operação de
+            içamento de carga, identificada pelo ID {{ id_avaliacao }}. O objetivo deste documento é validar
+            a segurança e a conformidade dos equipamentos e procedimentos utilizados, com base nos dados
+            fornecidos e nos cálculos de engenharia realizados.
+        </p>
+    </section>
+
+    <!-- Desenvolvimento -->
+    <section>
+        <h1>2. DESENVOLVIMENTO</h1>
+        
+        <h2>2.1. Dados da Operação</h2>
+        <p>A operação foi realizada com os seguintes parâmetros principais:</p>
+        <ul>
+            <li><strong>Operador Responsável:</strong> {{ dados_guindauto.get('Nome Operador', 'Não informado') }}</li>
+            <li><strong>Guindaste Utilizado:</strong> {{ dados_icamento.get('Fabricante', 'N/A') }} - Modelo: {{ dados_icamento.get('Modelo Guindaste', 'N/A') }}</li>
+            <li><strong>Placa do Veículo:</strong> {{ dados_guindauto.get('Placa Guindaste', 'Não informado') }}</li>
+        </ul>
+
+        <h2>2.2. Metodologia de Cálculo de Carga</h2>
+        <p>A carga total da operação foi determinada pela soma do peso da carga, acessórios, cabos e uma margem de segurança. Os valores calculados foram:</p>
+        <table>
+            <tr><td>Peso da Carga</td><td>{{ "%.2f"|format(dados_icamento.get('Peso Carga (kg)')|float) }} kg</td></tr>
+            <tr><td>Margem de Segurança ({{ "%.0f"|format(dados_icamento.get('Margem Segurança (%)')|float) }}%)</td><td>{{ "%.2f"|format(dados_icamento.get('Peso a Considerar (kg)')|float - dados_icamento.get('Peso Carga (kg)')|float) }} kg</td></tr>
+            <tr><td>Peso dos Cabos</td><td>{{ "%.2f"|format(dados_icamento.get('Peso Cabos (kg)')|float) }} kg</td></tr>
+            <tr><td>Peso dos Acessórios</td><td>{{ "%.2f"|format(dados_icamento.get('Peso Acessórios (kg)')|float) }} kg</td></tr>
+            <tr class="total-row"><td><strong>Carga Total Calculada</strong></td><td><strong>{{ "%.2f"|format(dados_icamento.get('Carga Total (kg)')|float) }} kg</strong></td></tr>
+        </table>
+        
+        <h2>2.3. Diagrama e Análise de Capacidade</h2>
+        <p>O diagrama abaixo ilustra a configuração do içamento, demonstrando a relação entre raio, alcance e a zona de segurança operacional do equipamento. A análise de capacidade do guindaste indicou uma utilização de {{ dados_icamento.get('% Utilização Raio', 'N/A') }} no raio máximo e {{ dados_icamento.get('% Utilização Alcance', 'N/A') }} no alcance máximo.</p>
+        <img src="{{ diagrama_base64 }}" alt="Diagrama de Içamento">
+    </section>
+
+    <!-- Conclusão -->
+    <section>
+        <h1>3. CONCLUSÃO</h1>
+        <p>
+            Com base na análise dos dados e nos cálculos realizados, a operação foi considerada
+            <strong>{% if dados_icamento.get('Adequado') == 'TRUE' %}APROVADA{% else %}REPROVADA{% endif %}</strong>.
+            A carga total de {{ "%.2f"|format(dados_icamento.get('Carga Total (kg)')|float) }} kg está
+            {% if (dados_icamento.get('% Utilização Raio')|replace('%', '')|float) <= 80 and (dados_icamento.get('% Utilização Alcance')|replace('%', '')|float) <= 80 %}
+            dentro dos limites de segurança de 80% da capacidade do equipamento nas configurações avaliadas.
+            {% else %}
+            excedendo o limite de segurança de 80% da capacidade do equipamento, requerendo atenção especial.
+            {% endif %}
+        </p>
+        <p>Recomenda-se que todos os procedimentos de segurança padrão sejam seguidos durante a execução da tarefa.</p>
+    </section>
+
+</body>
+</html>
