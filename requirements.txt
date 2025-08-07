@@ -12,4 +12,6 @@ gspread
 google-auth
 requests
 weasyprint
+matplotlib
+
 
