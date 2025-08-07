@@ -8,10 +8,6 @@ import plotly.io as pio
 from operations.plot import criar_diagrama_guindaste
 
 
-
-
-
-
 def safe_to_numeric(value):
     if value is None: return 0.0
     numeric_value = pd.to_numeric(str(value).replace(',', '.'), errors='coerce')
