@@ -4,91 +4,62 @@ from datetime import datetime
 import numpy as np
 import base64
 
-# Nenhuma importação de Matplotlib ou Plotly é necessária aqui.
 
 def generate_svg_diagram(raio_max, alcance_max, angulo_minimo_fabricante):
     """
     Gera o código SVG de um diagrama técnico a partir dos dados da operação.
-    Esta técnica é vetorial, resultando em qualidade perfeita no PDF.
     """
-    # --- 1. Cálculos e Definições de Escala ---
-    # Converter dados de engenharia (metros, graus) para coordenadas SVG (pixels)
+    if raio_max <= 0: raio_max = 1
     angulo_operacao_rad = np.arctan2(alcance_max, raio_max)
     angulo_operacao_graus = np.degrees(angulo_operacao_rad)
     angulo_min_rad = np.radians(angulo_minimo_fabricante)
     comprimento_lanca = np.sqrt(raio_max**2 + alcance_max**2)
 
-    # Definir dimensões do SVG para manter a proporção
     svg_width = 800
-    padding = 60 # Espaçamento das bordas
-    # Fator de escala para converter metros em pixels
-    scale = (svg_width - 2 * padding) / raio_max if raio_max > 0 else 1
-    
+    padding = 60
+    scale = (svg_width - 2 * padding) / raio_max
     base_height = max(20, alcance_max * 0.05 * scale)
     svg_height = int(alcance_max * scale + base_height + 2 * padding)
-    
-    # Ponto de origem (base da lança no SVG). O eixo Y do SVG cresce para baixo.
     ox, oy = padding, svg_height - padding - base_height
 
-    # --- 2. Geração dos Componentes SVG como Strings ---
-    
-    # Lança de Operação
     lan_x = ox + raio_max * scale
     lan_y = oy - alcance_max * scale
     cor_lanca = 'royalblue' if angulo_operacao_graus >= angulo_minimo_fabricante else 'crimson'
     lanca_svg = f'<line x1="{ox}" y1="{oy}" x2="{lan_x}" y2="{lan_y}" stroke="{cor_lanca}" stroke-width="8" />'
 
-    # Zona de Risco
     raio_risco_svg = comprimento_lanca * scale
-    # Comando de caminho SVG: M(ove) to origin, L(ine) to start of arc, A(rc) to end of arc, Z (close path)
     x_risco_end = ox + raio_risco_svg * np.cos(angulo_min_rad)
     y_risco_end = oy - raio_risco_svg * np.sin(angulo_min_rad)
     path_risco = f'M {ox},{oy} L {ox + raio_risco_svg},{oy} A {raio_risco_svg},{raio_risco_svg} 0 0 0 {x_risco_end},{y_risco_end} Z'
     zona_risco_svg = f'<path d="{path_risco}" fill="pink" fill-opacity="0.5" />'
 
-    # Arco do Ângulo da Operação
     raio_arco_op_svg = comprimento_lanca * 0.25 * scale
     x_arco_end = ox + raio_arco_op_svg * np.cos(angulo_operacao_rad)
     y_arco_end = oy - raio_arco_op_svg * np.sin(angulo_operacao_rad)
-    # A flag "large-arc-flag" (0) e "sweep-flag" (1) definem como o arco é desenhado
     path_arco_op = f'M {ox + raio_arco_op_svg},{oy} A {raio_arco_op_svg},{raio_arco_op_svg} 0 0 1 {x_arco_end},{y_arco_end}'
     arco_op_svg = f'<path d="{path_arco_op}" fill="none" stroke="darkgreen" stroke-width="2" />'
 
-    # Texto do Ângulo
     text_angle_rad_op = angulo_operacao_rad / 2
     text_x = ox + raio_arco_op_svg * 1.2 * np.cos(text_angle_rad_op)
     text_y = oy - raio_arco_op_svg * 1.2 * np.sin(text_angle_rad_op)
     texto_angulo_svg = f'<text x="{text_x}" y="{text_y}" fill="darkgreen" font-size="20" font-weight="bold" text-anchor="middle" dominant-baseline="middle">{angulo_operacao_graus:.1f}°</text>'
 
-    # Base e Torre
     base_width_svg = max(30, raio_max * 0.05 * scale)
     base_svg = f'<rect x="{ox - base_width_svg/2}" y="{oy}" width="{base_width_svg}" height="{base_height*0.5}" fill="lightgray" /><rect x="{ox - 6}" y="{oy - base_height}" width="12" height="{base_height}" fill="dimgray" />'
 
-    # Linha e texto do Raio
     raio_line_y = oy + padding / 2
     raio_svg = f'<line x1="{ox}" y1="{raio_line_y}" x2="{lan_x}" y2="{raio_line_y}" stroke="black" stroke-width="1" stroke-dasharray="5,5" /><text x="{ox + (lan_x-ox)/2}" y="{raio_line_y + 15}" text-anchor="middle" font-size="14">Raio: {raio_max:.2f} m</text>'
     
-    # --- 3. Montagem do SVG Final ---
     svg_code = f"""
     <svg width="100%" viewBox="0 0 {svg_width} {svg_height}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">
         <style>.legend-text {{ font-size: 16px; }}</style>
-        {zona_risco_svg}
-        {lanca_svg}
-        {base_svg}
-        {arco_op_svg}
-        {texto_angulo_svg}
-        {raio_svg}
-        <!-- Legenda -->
+        {zona_risco_svg} {lanca_svg} {base_svg} {arco_op_svg} {texto_angulo_svg} {raio_svg}
         <g transform="translate({padding}, 20)">
-            <rect x="0" y="0" width="20" height="15" fill="royalblue" />
-            <text x="30" y="12" class="legend-text">Lança de Operação</text>
-            <rect x="0" y="25" width="20" height="15" fill="pink" fill-opacity="0.5" />
-            <text x="30" y="37" class="legend-text">Zona de Risco (&lt; {angulo_minimo_fabricante}°)</text>
+            <rect x="0" y="0" width="20" height="15" fill="royalblue" /><text x="30" y="12" class="legend-text">Lança de Operação</text>
+            <rect x="0" y="25" width="20" height="15" fill="pink" fill-opacity="0.5" /><text x="30" y="37" class="legend-text">Zona de Risco (&lt; {angulo_minimo_fabricante}°)</text>
         </g>
-    </svg>
-    """
+    </svg>"""
     return f"data:image/svg+xml;base64,{base64.b64encode(svg_code.encode('utf-8')).decode('utf-8')}"
-
 
 def safe_to_numeric(value):
     if value is None: return 0.0
@@ -96,7 +67,7 @@ def safe_to_numeric(value):
     return numeric_value if pd.notna(numeric_value) else 0.0
 
 def get_report_html(context):
-    # (Esta função permanece a mesma da versão anterior, já está correta)
+    # (O código desta função permanece o mesmo)
     dados_icamento = context["dados_icamento"]
     dados_guindauto = context["dados_guindauto"]
     fabricante = dados_icamento.get('fabricante_guindaste', '---')
@@ -108,39 +79,36 @@ def get_report_html(context):
     peso_lingada_kg = f"{safe_to_numeric(dados_icamento.get('peso_acessorios')):.2f} Kg"
     carga_total_kg = f"{safe_to_numeric(dados_icamento.get('carga_total')):.2f} Kg"
     perc_capacidade = dados_icamento.get('% Utilização Raio', '---')
-    
     html = f"""
     <!DOCTYPE html><html lang="pt-br"><head><meta charset="UTF-8"><title>PAME - {context['id_avaliacao']}</title></head>
-    <body>
-        <div class="report-container"><header class="report-header"><div class="logo-placeholder"><span class="logo-text">VIBRA</span></div><div class="title-container"><span class="main-title">PAME Manutenção e Instalações</span></div><div class="header-details"><span><strong>DATA:</strong> {context['data_emissao']}</span><span><strong>REV:</strong> 00</span><span><strong>FL:</strong> 1/1</span></div></header>
-        <div class="main-content"><div class="left-column"><table class="data-table">
-        <tr class="section-title"><td colspan="2">CONFIGURAÇÃO DO IÇAMENTO - LIFTING CONFIGURATION</td></tr>
-        <tr><td class="label">Guindaste {fabricante}</td><td class="value">{nome_guindaste}</td></tr>
-        <tr><td class="label">COMP. LANÇA / BOOM LENGTH</td><td class="value">{comp_lanca_mm}</td></tr>
-        <tr><td class="label">RAIO DE OPERAÇÃO / RADIUS</td><td class="value">{raio_op_m}</td></tr>
-        <tr><td class="label">CAPACIDADE DE CARGA / CAPACITY</td><td class="value">{capacidade_carga_kg}</td></tr>
-        <tr><td class="label">PESO DA CARGA / MAX LOAD</td><td class="value">{peso_carga_kg}</td></tr>
-        <tr><td class="label">PESO DO MOITÃO / BLOCK WEIGTH</td><td class="value">---</td></tr>
-        <tr><td class="label">PESO DA LINGADA / RIGGING WEIGTH</td><td class="value">{peso_lingada_kg}</td></tr>
-        <tr><td class="label">PESO TOTAL / TOTAL WEIGTH</td><td class="value">{carga_total_kg}</td></tr>
-        <tr><td class="label">% DA CAPACIDADE / PERCENTAGE</td><td class="value">{perc_capacidade}</td></tr>
-        <tr class="section-title"><td colspan="2">ESPECIFICAÇÃO DA LINGADA - RIGGING CONFIGURATION</td></tr>
-        <tr><td class="label">ESTROPO 01</td><td class="value">---</td></tr>
-        <tr><td class="label">ESTROPO 02</td><td class="value">---</td></tr>
-        <tr><td class="label">BALANCIM / SPREADER BAR</td><td class="value">---</td></tr>
-        <tr class="section-title"><td colspan="2">RESPONSABILIDADES / ASSINATURA</td></tr>
-        <tr><td class="label">ELABORADO POR: RIGGER</td><td class="value" style="height: 25px;"></td></tr>
-        <tr><td class="label">OPERADOR GUINDASTE</td><td class="value" style="height: 25px;"></td></tr>
-        <tr><td class="label">SUPERVISOR DE MONTAGEM</td><td class="value" style="height: 25px;"></td></tr>
-        <tr><td class="label">TÉC. DE SEGURANÇA</td><td class="value" style="height: 25px;"></td></tr>
-        </table></div>
-        <div class="right-column"><h2>Diagrama Técnico da Operação de Içamento</h2><img src="{context['diagrama_base64']}" alt="Diagrama de Içamento"></div></div>
-        <footer class="report-footer"><div class="footer-box"><span class="label">CLIENTE:</span><span class="value large">VIBRA ENERGIA</span></div><div class="footer-box wide"><span class="label">TÍTULO:</span><span class="value large">ESTUDO DE RIGGING - {context['id_avaliacao']}</span><span class="value">PARA IÇAMENTO DE CARGA</span></div><div class="footer-box"><span class="label">LOCAL:</span><span class="value">ROD. CASTELO BRANCO - BARUERI/SP</span></div></footer>
-        </div></body></html>
+    <body><div class="report-container"><header class="report-header"><div class="logo-placeholder"><span class="logo-text">VIBRA</span></div><div class="title-container"><span class="main-title">PAME Manutenção e Instalações</span></div><div class="header-details"><span><strong>DATA:</strong> {context['data_emissao']}</span><span><strong>REV:</strong> 00</span><span><strong>FL:</strong> 1/1</span></div></header>
+    <div class="main-content"><div class="left-column"><table class="data-table">
+    <tr class="section-title"><td colspan="2">CONFIGURAÇÃO DO IÇAMENTO</td></tr>
+    <tr><td class="label">Guindaste {fabricante}</td><td class="value">{nome_guindaste}</td></tr>
+    <tr><td class="label">COMP. LANÇA / BOOM LENGTH</td><td class="value">{comp_lanca_mm}</td></tr>
+    <tr><td class="label">RAIO DE OPERAÇÃO / RADIUS</td><td class="value">{raio_op_m}</td></tr>
+    <tr><td class="label">CAPACIDADE DE CARGA / CAPACITY</td><td class="value">{capacidade_carga_kg}</td></tr>
+    <tr><td class="label">PESO DA CARGA / MAX LOAD</td><td class="value">{peso_carga_kg}</td></tr>
+    <tr><td class="label">PESO DO MOITÃO / BLOCK WEIGTH</td><td class="value">---</td></tr>
+    <tr><td class="label">PESO DA LINGADA / RIGGING WEIGTH</td><td class="value">{peso_lingada_kg}</td></tr>
+    <tr><td class="label">PESO TOTAL / TOTAL WEIGTH</td><td class="value">{carga_total_kg}</td></tr>
+    <tr><td class="label">% DA CAPACIDADE / PERCENTAGE</td><td class="value">{perc_capacidade}</td></tr>
+    <tr class="section-title"><td colspan="2">ESPECIFICAÇÃO DA LINGADA</td></tr>
+    <tr><td class="label">ESTROPO 01</td><td class="value">---</td></tr><tr><td class="label">ESTROPO 02</td><td class="value">---</td></tr><tr><td class="label">BALANCIM / SPREADER BAR</td><td class="value">---</td></tr>
+    <tr class="section-title"><td colspan="2">RESPONSABILIDADES / ASSINATURA</td></tr>
+    <tr><td class="label">ELABORADO POR: RIGGER</td><td class="value" style="height: 25px;"></td></tr>
+    <tr><td class="label">OPERADOR GUINDASTE</td><td class="value" style="height: 25px;"></td></tr>
+    <tr><td class="label">SUPERVISOR DE MONTAGEM</td><td class="value" style="height: 25px;"></td></tr>
+    <tr><td class="label">TÉC. DE SEGURANÇA</td><td class="value" style="height: 25px;"></td></tr>
+    </table></div>
+    <div class="right-column"><h2>Diagrama Técnico</h2><img src="{context['diagrama_base64']}" alt="Diagrama"></div></div>
+    <footer class="report-footer"><div class="footer-box"><span class="label">CLIENTE:</span><span class="value large">VIBRA ENERGIA</span></div><div class="footer-box wide"><span class="label">TÍTULO:</span><span class="value large">ESTUDO DE RIGGING - {context['id_avaliacao']}</span><span class="value">PARA IÇAMENTO DE CARGA</span></div><div class="footer-box"><span class="label">LOCAL:</span><span class="value">ROD. CASTELO BRANCO - BARUERI/SP</span></div></footer>
+    </div></body></html>
     """
     return html
 
 def get_report_css():
+    # (O código desta função permanece o mesmo)
     css = """
     @page { size: A3 landscape; margin: 1.5cm; }
     body { font-family: Arial, sans-serif; font-size: 11pt; color: #333; }
