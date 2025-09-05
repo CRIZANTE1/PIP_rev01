@@ -186,10 +186,15 @@ def front_page():
                 ]
             }))
             st.subheader("🎯 Resultado da Validação")
-            if val.get('adequado'):
-                st.success(f"✅ {val.get('mensagem')}")
+            mensagem_validacao = val.get('mensagem', 'Falha na validação.')
+            
+            # Verifica o conteúdo da mensagem para decidir a cor do alerta
+            if "INSEGURA" in mensagem_validacao.upper():
+                st.error(f"❌ {mensagem_validacao}")
+            elif "ATENÇÃO" in mensagem_validacao.upper():
+                st.warning(f"⚠️ {mensagem_validacao}")
             else:
-                st.error(f"⚠️ {val.get('mensagem', 'Falha na validação.')}")
+                st.success(f"✅ {mensagem_validacao}")
             
             c1, c2 = st.columns(2)
             c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%")
@@ -355,6 +360,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
