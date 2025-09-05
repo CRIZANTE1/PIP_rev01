@@ -112,109 +112,133 @@ def front_page():
 
     # --- ABA 1: CÁLCULO DE IÇAMENTO ---
     with tab1:
-        col1_estado, _ = st.columns(2)
-        with col1_estado:
-            estado_equipamento = st.radio("Estado do Equipamento", ["Novo", "Usado"], key="estado_equip_radio", help="Novo: 10% de margem. Usado: 25%.")
-        if estado_equipamento == "Novo": st.info("Margem de segurança aplicada: 10%")
-        else: st.warning("Margem de segurança aplicada: 25%")
+        st.header("Análise e Simulação de Içamento")
 
-        with st.form("formulario_carga"):
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("Dados da Carga")
-                peso_carga = st.number_input("Peso da carga (kg)", min_value=0.1, step=100.0)
-                peso_acessorios = st.number_input("Peso dos acessórios (kg)", min_value=0.0, step=1.0)
-            with col2:
-                st.subheader("Dados do Guindaste")
-                fabricante_guindaste_calc = st.text_input("Fabricante do Guindaste")
-                nome_guindaste_calc = st.text_input("Nome do Guindaste (Ex: AGI, XCA250 BR II)")
-                modelo_guindaste_calc = st.text_input("Modelo do Guindaste (Opcional)")
-                
-            st.subheader("Capacidades do Guindaste")
-            col3, col4 = st.columns(2)
-            with col3:
-                raio_max = st.number_input("Raio Máximo (m)", min_value=0.1, step=0.1)
-                capacidade_raio = st.number_input("Capacidade no Raio Máximo (kg)", min_value=0.1, step=100.0)
-            with col4:
-                extensao_lanca = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
-                capacidade_alcance = st.number_input("Capacidade na Lança Máxima (kg)", min_value=0.1, step=100.0)
-                
-                # --- CORREÇÃO DEFINITIVA AQUI ---
-                # O input do ângulo DEVE estar aqui, dentro do formulário, com sua key.
-                st.number_input(
-                    "Ângulo Mínimo da Lança (°)", 
-                    min_value=1.0, 
-                    max_value=89.0, 
-                    value=40.0,
-                    key="angulo_minimo_input" # A key é essencial
-                )
+        # --- Coluna de Inputs (à Esquerda) ---
+        col_inputs, col_results = st.columns([1, 2], gap="large")
+        with col_inputs:
+            st.subheader("Parâmetros da Operação")
+            
+            # Usar `key` em todos os inputs para salvar no session_state
+            st.radio(
+                "Estado do Equipamento", 
+                ["Novo", "Usado"], 
+                key="estado_equip_radio", 
+                help="Novo: 10% de margem. Usado: 25%."
+            )
+            
+            st.number_input("Peso da carga (kg)", min_value=0.1, step=100.0, key="peso_carga")
+            st.number_input("Peso dos acessórios (kg)", min_value=0.0, step=1.0, key="peso_acessorios")
 
-            # O botão de submit do formulário
-            submitted = st.form_submit_button("Calcular")
-            if submitted:
+            st.divider()
+            
+            st.text_input("Fabricante do Guindaste", key="fabricante_guindaste_calc")
+            st.text_input("Nome do Guindaste", key="nome_guindaste_calc", placeholder="Ex: AGI, XCA250 BR II")
+            
+            st.number_input("Raio de Operação (m)", min_value=0.1, step=0.1, key="raio_max")
+            st.number_input("Capacidade no Raio (kg)", min_value=0.1, step=100.0, key="capacidade_raio")
+            
+            st.number_input("Extensão da Lança (m)", min_value=0.1, step=0.1, key="extensao_lanca")
+            st.number_input("Capacidade na Lança (kg)", min_value=0.1, step=100.0, key="capacidade_alcance")
+
+            st.number_input(
+                "Ângulo Mínimo da Lança (°)", 
+                min_value=1.0, 
+                max_value=89.0, 
+                value=40.0,
+                key="angulo_minimo_input"
+            )
+
+        # --- Coluna de Resultados (à Direita) ---
+        with col_results:
+            st.subheader("Resultados e Análise em Tempo Real")
+            
+            # Verifica se todos os inputs necessários foram preenchidos
+            inputs_validos = all([
+                st.session_state.peso_carga > 0,
+                st.session_state.raio_max > 0,
+                st.session_state.capacidade_raio > 0,
+                st.session_state.extensao_lanca > 0,
+                st.session_state.capacidade_alcance > 0
+            ])
+
+            if not inputs_validos:
+                st.info("📊 Preencha todos os parâmetros à esquerda para ver os resultados e o diagrama.")
+            else:
                 try:
-                    # A leitura do valor do session_state DEVE acontecer DEPOIS que o botão for pressionado.
-                    angulo_minimo_para_calculo = st.session_state.angulo_minimo_input
-
-                    resultado = calcular_carga_total(peso_carga, estado_equipamento=="Novo", peso_acessorios)
-                    
-                    st.session_state.dados_icamento = {
-                        **resultado,
-                        'fabricante_guindaste': fabricante_guindaste_calc,
-                        'nome_guindaste': nome_guindaste_calc,
-                        'modelo_guindaste': modelo_guindaste_calc,
-                        'raio_max': raio_max,
-                        'capacidade_raio': capacidade_raio,
-                        'extensao_lanca': extensao_lanca,
-                        'capacidade_alcance': capacidade_alcance,
-                        'angulo_minimo_fabricante': angulo_minimo_para_calculo
-                    }
+                    # Realiza os cálculos usando os valores do session_state
+                    equip_novo = st.session_state.estado_equip_radio == "Novo"
+                    resultado_calc = calcular_carga_total(st.session_state.peso_carga, equip_novo, st.session_state.peso_acessorios)
                     
                     validacao = validar_guindaste(
-                        carga_total=resultado['carga_total'], 
-                        capacidade_raio=capacidade_raio, 
-                        capacidade_alcance_max=capacidade_alcance, 
-                        raio_max=raio_max, 
-                        extensao_lanca=extensao_lanca,
-                        angulo_minimo_fabricante=angulo_minimo_para_calculo
+                        carga_total=resultado_calc['carga_total'], 
+                        capacidade_raio=st.session_state.capacidade_raio, 
+                        capacidade_alcance_max=st.session_state.capacidade_alcance, 
+                        raio_max=st.session_state.raio_max, 
+                        extensao_lanca=st.session_state.extensao_lanca,
+                        angulo_minimo_fabricante=st.session_state.angulo_minimo_input
                     )
-                    st.session_state.dados_icamento['validacao'] = validacao
-                    st.success("Cálculo realizado. Verifique os resultados abaixo.")
+
+                    # Armazena os resultados no session_state para a Aba 2
+                    st.session_state.dados_icamento = {
+                        **resultado_calc,
+                        'fabricante_guindaste': st.session_state.fabricante_guindaste_calc,
+                        'nome_guindaste': st.session_state.nome_guindaste_calc,
+                        'modelo_guindaste': "", # Modelo opcional removido para simplificar a UI
+                        'raio_max': st.session_state.raio_max,
+                        'capacidade_raio': st.session_state.capacidade_raio,
+                        'extensao_lanca': st.session_state.extensao_lanca,
+                        'capacidade_alcance': st.session_state.capacidade_alcance,
+                        'angulo_minimo_fabricante': st.session_state.angulo_minimo_input,
+                        'validacao': validacao # Adiciona a validação aos dados salvos
+                    }
+
+                    # --- Exibição dos Resultados ---
+                    mensagem_validacao = validacao.get('mensagem', 'Falha na validação.')
+                    if "INSEGURA" in mensagem_validacao.upper():
+                        st.error(f"❌ {mensagem_validacao}")
+                    elif "ATENÇÃO" in mensagem_validacao.upper():
+                        st.warning(f"⚠️ {mensagem_validacao}")
+                    else:
+                        st.success(f"✅ {mensagem_validacao}")
+                    
+                    st.plotly_chart(
+                        criar_diagrama_guindaste(
+                            st.session_state.raio_max, 
+                            st.session_state.extensao_lanca, 
+                            resultado_calc['carga_total'], 
+                            st.session_state.capacidade_raio, 
+                            st.session_state.angulo_minimo_input
+                        ), 
+                        use_container_width=True
+                    )
+
+                    # Tabela de resultados e métricas em colunas
+                    col_tabela, col_metricas = st.columns(2)
+                    with col_tabela:
+                        st.dataframe(pd.DataFrame({
+                            'Descrição': ['Peso Carga', 'Margem (%)', 'Peso Segurança', 'Peso Acessórios', 'Peso Cabos (3%)', 'CARGA TOTAL'],
+                            'Valor (kg)': [
+                                f"{resultado_calc.get('peso_carga', 0):.2f}",
+                                f"{resultado_calc.get('margem_seguranca_percentual', 0):.2f}",
+                                f"{resultado_calc.get('peso_seguranca', 0):.2f}",
+                                f"{resultado_calc.get('peso_acessorios', 0):.2f}",
+                                f"{resultado_calc.get('peso_cabos', 0):.2f}",
+                                f"**{resultado_calc.get('carga_total', 0):.2f}**"
+                            ]
+                        }), hide_index=True)
+                    
+                    with col_metricas:
+                        detalhes = validacao.get('detalhes', {})
+                        st.metric("Ângulo da Lança", f"{detalhes.get('angulo_lanca', 0):.1f}°")
+                        st.metric("Utilização no Raio", f"{detalhes.get('porcentagem_raio', 0):.1f}%")
+                        st.metric("Utilização na Lança", f"{detalhes.get('porcentagem_alcance', 0):.1f}%")
+                
+                except ValueError as e:
+                    # Captura erros de lógica (ex: raio > lança) e exibe de forma amigável
+                    st.error(f"⚠️ Erro de Validação: {e}")
                 except Exception as e:
-                    st.error(f"Erro no cálculo: {e}")
-        
-        if st.session_state.dados_icamento:
-            res = st.session_state.dados_icamento
-            val = res.get('validacao', {})
-            st.subheader("📊 Resultados do Cálculo")
-            st.table(pd.DataFrame({
-                'Descrição': ['Peso da carga', 'Margem (%)', 'Peso Segurança', 'Peso a Considerar', 'Peso Cabos (3%)', 'Peso Acessórios', 'CARGA TOTAL'],
-                'Valor (kg)': [
-                    f"{res.get('peso_carga', 0):.2f}",
-                    f"{res.get('margem_seguranca_percentual', 0):.2f}",
-                    f"{res.get('peso_seguranca', 0):.2f}",
-                    f"{res.get('peso_considerar', 0):.2f}",
-                    f"{res.get('peso_cabos', 0):.2f}",
-                    f"{res.get('peso_acessorios', 0):.2f}",
-                    f"**{res.get('carga_total', 0):.2f}**"
-                ]
-            }))
-            
-            st.subheader("🎯 Resultado da Validação")
-            mensagem_validacao = val.get('mensagem', 'Falha na validação.')
-            
-            if "INSEGURA" in mensagem_validacao.upper():
-                st.error(f"❌ {mensagem_validacao}")
-            elif "ATENÇÃO" in mensagem_validacao.upper():
-                st.warning(f"⚠️ {mensagem_validacao}")
-            else:
-                st.success(f"✅ {mensagem_validacao}")
-            
-            c1, c2 = st.columns(2)
-            c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%")
-            c2.metric("Utilização na Lança", f"{val.get('detalhes', {}).get('porcentagem_alcance', 0):.1f}%")
-            
-            st.plotly_chart(criar_diagrama_guindaste(res['raio_max'], res['extensao_lanca'], res['carga_total'], res['capacidade_raio'], res['angulo_minimo_fabricante']), use_container_width=True)
+                    st.error(f"Ocorreu um erro inesperado: {e}")
 
     # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
@@ -374,6 +398,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
