@@ -156,19 +156,19 @@ def front_page():
                         'angulo_minimo_fabricante': angulo_minimo_fabricante
                     }
                     
+
                     validacao = validar_guindaste(
-                        resultado['carga_total'], 
-                        capacidade_raio, 
-                        capacidade_alcance, 
-                        raio_max, 
-                        extensao_lanca,
-                        angulo_minimo_fabricante 
+                        carga_total=resultado['carga_total'], 
+                        capacidade_raio=capacidade_raio, 
+                        capacidade_alcance_max=capacidade_alcance, 
+                        raio_max=raio_max, 
+                        extensao_lanca=extensao_lanca,
+                        angulo_minimo_fabricante=angulo_minimo_fabricante 
                     )
                     st.session_state.dados_icamento['validacao'] = validacao
                     st.success("Cálculo realizado. Verifique os resultados abaixo.")
                 except Exception as e:
                     st.error(f"Erro no cálculo: {e}")
-        
         if st.session_state.dados_icamento:
             res = st.session_state.dados_icamento
             val = res.get('validacao', {})
@@ -355,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
