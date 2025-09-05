@@ -195,7 +195,7 @@ def front_page():
             c1.metric("Utilização no Raio", f"{val.get('detalhes', {}).get('porcentagem_raio', 0):.1f}%")
             c2.metric("Utilização na Lança", f"{val.get('detalhes', {}).get('porcentagem_alcance', 0):.1f}%")
             
-            st.plotly_chart(criar_diagrama_guindaste(res['raio_max'], res['alcance_max'], res['carga_total'], res['capacidade_raio'], res['angulo_minimo_fabricante']), use_container_width=True)
+            st.plotly_chart(criar_diagrama_guindaste(res['raio_max'], res['extensao_lanca'], res['carga_total'], res['capacidade_raio'], res['angulo_minimo_fabricante']), use_container_width=True)
 
     # --- ABA 2: INFORMAÇÕES E DOCUMENTOS ---
     with tab2:
@@ -355,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
