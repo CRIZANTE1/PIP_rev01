@@ -22,7 +22,7 @@ def calcular_carga_total(peso_carga, equipamento_novo=True, peso_acessorios=0):
         'margem_seguranca_percentual': margem_seguranca * 100
     }
 
-def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, extensao_lanca=None, angulo_minimo_fabricante=40.0):
+def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, extensao_lanca=None, angulo_minimo_fabricante=None):
     """Valida se o guindaste é adequado com base em sua capacidade e ângulo."""
 
     if carga_total <= 0:
@@ -68,4 +68,5 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
             'angulo_minimo_fabricante': angulo_minimo_fabricante
         }
     }
+
 
