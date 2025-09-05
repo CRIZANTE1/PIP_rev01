@@ -18,40 +18,52 @@ logging.basicConfig(level=logging.INFO)
 
 def mostrar_instrucoes():
     with st.expander("📖 Como usar este aplicativo", expanded=False):
-        st.markdown("""### Guia de Uso
+        st.markdown("""
+        #### Guia Rápido de Uso
         
-        1. **Dados da Carga**:
-           * Digite o peso da carga principal em kg
-           * Selecione se o equipamento é novo ou usado
-             - Novo: aplica margem de segurança de 10%
-             - Usado: aplica margem de segurança de 25%
-           * Informe o peso dos acessórios (cintas, grilhetas, etc.)
-           * O peso dos cabos será calculado automaticamente (3%)
+        Siga estes passos para realizar uma análise de içamento completa:
         
-        2. **Dados do Guindaste**:
-           * Preencha as informações do fabricante e modelo
-           * Informe o raio máximo e sua capacidade
-           * Informe a extensão máxima da lança e sua capacidade
+        ---
         
-        3. **Resultados**:
-           * O sistema calculará automaticamente:
-             - Margem de segurança
-             - Peso total a considerar
-             - Peso dos cabos
-             - Carga total final
-           * Validará se o guindaste é adequado
-           * Mostrará as porcentagens de utilização
+        ##### **Aba 1: 📝 Dados do Içamento**
         
-        ⚠️ **Importante**: Se a utilização ultrapassar 80%, será necessária aprovação da engenharia e segurança.
+        1.  **Dados da Carga:**
+            -   **Peso da Carga (kg):** Informe o peso principal a ser içado.
+            -   **Peso dos Acessórios (kg):** Adicione o peso de cintas, manilhas, etc.
         
-        4. **Aba "Dados do Içamento"**: Preencha os dados da carga e do guindaste e clique em **Calcular**.
-        5. **Aba "Informações e Documentos"**:
-            - **Dados do Operador**: Faça o upload da CNH e clique em "Extrair Dados" para preencher as informações do operador.
-            - **Dados do Equipamento**: Faça o upload do CRLV para preencher os dados do veículo.
-            - **Preenchimento Manual**: Preencha ou corrija os demais campos necessários.
-            - **Documentos**: Faça o upload de todos os outros documentos solicitados.
-        6. **Salvar**: Após conferir tudo, clique em **"💾 Salvar Todas as Informações"** para registrar a operação completa.
+        2.  **Estado do Equipamento:**
+            -   Selecione **"Novo"** para aplicar uma margem de segurança de **10%**.
+            -   Selecione **"Usado"** para aplicar uma margem de segurança de **25%**.
+        
+        3.  **Dados e Capacidades do Guindaste:**
+            -   Preencha as informações do fabricante e modelo.
+            -   Informe o **Raio Máximo** e a capacidade de carga nesse ponto.
+            -   Informe a **Extensão Máxima da Lança** e a capacidade nesse ponto.
+            -   Insira o **Ângulo Mínimo da Lança** conforme especificado pelo fabricante.
+
+        4.  **Calcular:**
+            -   Clique no botão **"Calcular"** para ver os resultados, a validação de segurança e o diagrama da operação.
+        
+        > ⚠️ **Atenção:** Se a utilização da capacidade do guindaste exceder **80%**, a operação é considerada de risco e requer análise adicional da engenharia.
+        
+        ---
+        
+        ##### **Aba 2: 🏗️ Informações e Documentos**
+        
+        1.  **Extração de Dados com IA:**
+            -   **Operador:** Faça o upload do arquivo da **CNH** e clique em **"Extrair e Validar CNH com IA"**.
+            -   **Equipamento:** Faça o upload do **CRLV** e clique em **"Extrair Dados do CRLV"**.
+            -   Faça o mesmo para os documentos **ART**, **NR-11** e **Manutenção Preventiva**.
+        
+        2.  **Preenchimento Manual:**
+            -   Complete ou corrija qualquer informação que não tenha sido preenchida automaticamente.
+            -   Faça o upload do **Gráfico de Carga** do equipamento.
+        
+        3.  **Salvar Operação:**
+            -   Após preencher todos os campos e verificar os documentos, clique em **"💾 Salvar Todas as Informações"**.
+            -   Isso registrará a operação permanentemente no sistema.
         """)
+
 
 def gerar_id_avaliacao():
     return f"AV{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
@@ -343,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
