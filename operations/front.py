@@ -151,7 +151,7 @@ def front_page():
                         'modelo_guindaste': modelo_guindaste_calc,
                         'raio_max': raio_max,
                         'capacidade_raio': capacidade_raio,
-                        'alcance_max': alcance_max,
+                        'extensao_lanca': extensao_lanca,
                         'capacidade_alcance': capacidade_alcance,
                         'angulo_minimo_fabricante': angulo_minimo_fabricante
                     }
@@ -161,7 +161,7 @@ def front_page():
                         capacidade_raio, 
                         capacidade_alcance, 
                         raio_max, 
-                        alcance_max,
+                        extensao_lanca,
                         angulo_minimo_fabricante 
                     )
                     st.session_state.dados_icamento['validacao'] = validacao
@@ -355,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
