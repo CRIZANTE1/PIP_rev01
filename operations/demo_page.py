@@ -15,7 +15,7 @@ def show_demo_page():
     """)
     st.divider()
 
-
+    # --- Início da Lógica da Calculadora ---
     demo_keys = [
         "demo_estado_equip_radio", "demo_peso_carga", "demo_peso_acessorios",
         "demo_fabricante_guindaste_calc", "demo_nome_guindaste_calc", "demo_raio_max",
@@ -28,8 +28,6 @@ def show_demo_page():
             if key == "demo_estado_equip_radio": st.session_state[key] = "Novo"
             if key == "demo_angulo_minimo_input": st.session_state[key] = 40.0
 
-
-    # --- Layout da Calculadora ---
     st.header("Análise e Simulação de Içamento")
     col_inputs, col_results = st.columns([1, 2], gap="large")
     
@@ -120,6 +118,36 @@ def show_demo_page():
                     st.metric("Ângulo da Lança", f"{detalhes.get('angulo_lanca', 0):.1f}°")
                     st.metric("Utilização no Raio", f"{detalhes.get('porcentagem_raio', 0):.1f}%")
                     st.metric("Utilização na Lança", f"{detalhes.get('porcentagem_alcance', 0):.1f}%")
+
+                # --- SEÇÃO DE EXPLICAÇÃO DOS CÁLCULOS (TEXTO MELHORADO) ---
+                st.divider()
+                with st.expander("📖 Entenda a Metodologia de Cálculo", expanded=True):
+                    st.markdown("""
+                    A análise de segurança desta ferramenta é baseada em dois cálculos principais, seguindo as melhores práticas de engenharia de içamento.
+                    
+                    #### 1. Cálculo da Carga Total
+                    A carga que o guindaste realmente "sente" é maior que apenas o peso da peça. A fórmula utilizada é:
+                    
+                    `Carga a Considerar = Peso da Carga * (1 + Margem de Segurança)`
+                    `Carga Total = Carga a Considerar + Peso dos Acessórios + (Carga a Considerar * 3%)`
+                    
+                    - **Margem de Segurança:** Aplicamos **10%** para equipamentos novos e **25%** para usados, mitigando riscos e incertezas.
+                    - **Peso dos Cabos:** Um acréscimo de **3%** é adicionado para compensar o peso dos cabos de aço do próprio guindaste.
+                    
+                    ---
+                    
+                    #### 2. Cálculo do Ângulo da Lança
+                    O ângulo da lança é um fator crítico para a estabilidade. Ele é determinado pela geometria da operação, formando um triângulo retângulo onde:
+                    - A **Extensão da Lança** é a **Hipotenusa**.
+                    - O **Raio de Operação** é o **Cateto Adjacente** ao ângulo.
+                    
+                    Utilizamos a função trigonométrica do **Arco Cosseno** para encontrar o ângulo:
+                    
+                    `Ângulo = arccos(Raio de Operação / Extensão da Lança)`
+                    
+                    - **Validação:** O sistema então verifica se este ângulo calculado é **maior ou igual** ao Ângulo Mínimo de Segurança informado. Ângulos baixos (próximos da horizontal) aumentam drasticamente o esforço sobre o guindaste e são extremamente perigosos.
+                    """)
+                # --- FIM DA SEÇÃO DE EXPLICAÇÃO ---
             
             except ValueError as e:
                 st.error(f"⚠️ Erro de Validação: {e}")
