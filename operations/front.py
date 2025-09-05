@@ -330,7 +330,7 @@ def front_page():
                             d_icamento.get('modelo_guindaste'),    
                             d_icamento.get('raio_max'),
                             d_icamento.get('capacidade_raio'),
-                            d_icamento.get('alcance_max'),
+                            d_icamento.get('extensao_lanca'),
                             d_icamento.get('capacidade_alcance'),
                             d_icamento.get('angulo_minimo_fabricante')
                         ]
@@ -355,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
