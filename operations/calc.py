@@ -21,8 +21,8 @@ def calcular_carga_total(peso_carga, equipamento_novo=True, peso_acessorios=0):
         'carga_total': carga_total,
         'margem_seguranca_percentual': margem_seguranca * 100
     }
-#--------------------- Validação da máquina--------------------------------- #
-def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, alcance_max=None):
+
+def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, alcance_max=None, angulo_minimo_fabricante=45.0): # MUDANÇA 1: Adicionado novo parâmetro
     """Valida se o guindaste é adequado com base em sua capacidade e ângulo."""
 
     if carga_total <= 0:
@@ -31,14 +31,16 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
         raise ValueError("As capacidades do guindaste devem ser valores positivos.")
    
     angulo = np.degrees(np.arctan2(alcance_max, raio_max))
-    angulo_seguro = angulo >= 45 
+    # MUDANÇA 2: A validação agora usa o ângulo fornecido pelo fabricante
+    angulo_seguro = angulo >= angulo_minimo_fabricante 
 
     porcentagem_raio = (carga_total / capacidade_raio) * 100
     porcentagem_alcance_max = (carga_total / capacidade_alcance_max) * 100
     porcentagem_segura = max(porcentagem_raio, porcentagem_alcance_max)
     
     if not angulo_seguro:
-        mensagem = "ATENÇÃO: Ângulo da lança inferior a 45 graus. Operação não segura."
+        # MUDANÇA 3: A mensagem de erro agora é dinâmica e mais clara
+        mensagem = f"ATENÇÃO: Ângulo da lança ({angulo:.1f}°) inferior ao mínimo de segurança do fabricante ({angulo_minimo_fabricante}°). Operação não segura."
         adequado = False
     elif porcentagem_segura > 80:
         mensagem = "ATENÇÃO: A carga excede 80% da capacidade do guindaste. Consulte a engenharia e equipe de segurança."
@@ -59,6 +61,7 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
             'porcentagem_raio': porcentagem_raio,
             'porcentagem_alcance': porcentagem_alcance_max,
             'angulo_lanca': angulo,
-            'angulo_seguro': angulo_seguro
+            'angulo_seguro': angulo_seguro,
+            'angulo_minimo_fabricante': angulo_minimo_fabricante 
         }
     }
