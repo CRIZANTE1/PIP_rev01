@@ -138,12 +138,24 @@ def front_page():
             with col4:
                 extensao_lanca = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
                 capacidade_alcance = st.number_input("Capacidade na Lança Máxima (kg)", min_value=0.1, step=100.0)
-                angulo_minimo_para_calculo = st.session_state.get("angulo_minimo_input", 40.0)
+                
+                # --- CORREÇÃO DEFINITIVA AQUI ---
+                # O input do ângulo DEVE estar aqui, dentro do formulário, com sua key.
+                st.number_input(
+                    "Ângulo Mínimo da Lança (°)", 
+                    min_value=1.0, 
+                    max_value=89.0, 
+                    value=40.0,
+                    key="angulo_minimo_input" # A key é essencial
+                )
 
-            
-            if st.form_submit_button("Calcular"):
+            # O botão de submit do formulário
+            submitted = st.form_submit_button("Calcular")
+            if submitted:
                 try:
-                    
+                    # A leitura do valor do session_state DEVE acontecer DEPOIS que o botão for pressionado.
+                    angulo_minimo_para_calculo = st.session_state.angulo_minimo_input
+
                     resultado = calcular_carga_total(peso_carga, estado_equipamento=="Novo", peso_acessorios)
                     
                     st.session_state.dados_icamento = {
@@ -191,7 +203,6 @@ def front_page():
             st.subheader("🎯 Resultado da Validação")
             mensagem_validacao = val.get('mensagem', 'Falha na validação.')
             
-            # Verifica o conteúdo da mensagem para decidir a cor do alerta
             if "INSEGURA" in mensagem_validacao.upper():
                 st.error(f"❌ {mensagem_validacao}")
             elif "ATENÇÃO" in mensagem_validacao.upper():
@@ -363,6 +374,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
