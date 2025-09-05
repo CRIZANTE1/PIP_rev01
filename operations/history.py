@@ -5,6 +5,7 @@ from gdrive.gdrive_upload import GoogleDriveUploader
 from gdrive.config import LIFTING_SHEET_NAME, CRANE_SHEET_NAME
 from operations.plot import criar_diagrama_guindaste
 from operations.report_generator import generate_abnt_report
+from utils.helpers import safe_to_numeric
 
 @st.cache_data(ttl=600)
 def load_sheet_data(sheet_name):
@@ -22,8 +23,6 @@ def load_sheet_data(sheet_name):
     except Exception as e:
         st.error(f"Erro ao carregar dados da planilha '{sheet_name}': {e}")
         return pd.DataFrame()
-
-# CORREÇÃO: A função make_urls_clickable não é mais necessária e foi removida.
 
 def get_status_from_date(date_str):
     """Calcula o status (Válido/Vencido) a partir de uma string de data."""
@@ -65,10 +64,7 @@ def render_document_status(dados_guindauto):
         else:
             st.markdown(f"❌ **{doc_name}**: Documento não fornecido")
 
-def safe_to_numeric(series):
-    """Converte uma série para numérico de forma segura, tratando vírgulas."""
-    if series is None: return None
-    return pd.to_numeric(str(series).replace(',', '.'), errors='coerce')
+# MUDANÇA: A função local safe_to_numeric foi removida daqui, pois agora é importada.
 
 def render_diagrama(dados_icamento):
     """Adota um valor padrão de 40 graus para o ângulo mínimo se não for encontrado."""
@@ -79,7 +75,7 @@ def render_diagrama(dados_icamento):
         carga_total = safe_to_numeric(dados_icamento.get('Carga Total (kg)'))
         capacidade_raio = safe_to_numeric(dados_icamento.get('Capacidade Raio (kg)'))
         angulo_minimo = safe_to_numeric(dados_icamento.get('Ângulo Mínimo da Lança'))
-        if pd.isna(angulo_minimo):
+        if pd.isna(angulo_minimo) or angulo_minimo == 0:
             angulo_minimo = 40.0
             st.info("Ângulo mínimo da lança não informado. Adotando 40° como padrão para o diagrama.")
         if all(pd.notna([raio_max, alcance_max, carga_total, capacidade_raio])):
@@ -104,11 +100,9 @@ def show_history_page():
         return
 
     st.subheader("Buscar e Analisar Avaliação por ID")
-    # ... (o bloco de busca por ID permanece o mesmo)
     id_column = df_lifting.columns[0]
     search_id = st.text_input("Digite o ID da Avaliação (ex: AV20240101-abcdefgh)", key="search_id_input")
-    if st.button("Buscar por ID", key="search_button") and search_id:
-        st.markdown("---")
+    if search_id and (st.button("Buscar por ID", key="search_button") or 'search_id_input' in st.session_state):
         result_lifting = df_lifting[df_lifting[id_column] == search_id]
         result_crane = df_crane[df_crane.iloc[:, 0] == search_id]
         if not result_lifting.empty and not result_crane.empty:
@@ -116,17 +110,20 @@ def show_history_page():
             dados_guindauto = result_crane.iloc[0]
             
             st.markdown("---")
-            with st.spinner("Gerando relatório PDF..."):
-                pdf_report = generate_abnt_report(dados_icamento, dados_guindauto)
-                st.download_button(
-                    label="📄 Baixar Relatório ABNT (PDF)",
-                    data=pdf_report,
-                    file_name=f"Relatorio_Içamento_{search_id}.pdf",
-                    mime="application/pdf"
-                )
-            st.markdown("---")
-
             st.header(f"Análise Detalhada da Avaliação: {search_id}")
+
+            col_btn, _ = st.columns([1, 2])
+            with col_btn:
+                with st.spinner("Preparando relatório PDF..."):
+                    pdf_report = generate_abnt_report(dados_icamento, dados_guindauto)
+                    st.download_button(
+                        label="📄 Baixar Relatório Técnico (PDF)",
+                        data=pdf_report,
+                        file_name=f"Relatorio_Tecnico_{search_id}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            
             col1, col2 = st.columns([2, 1])
             with col1:
                 render_diagrama(dados_icamento)
@@ -144,13 +141,14 @@ def show_history_page():
                 st.markdown("---")
                 st.write(f"**Operador:** {dados_guindauto.get('Nome Operador', 'N/A')}")
                 st.write(f"**Veículo (Placa):** {dados_guindauto.get('Placa Guindaste', 'N/A')}")
+
             st.markdown("---")
             render_document_status(dados_guindauto)
             with st.expander("Ver todos os dados brutos desta avaliação"):
                 st.subheader("Dados de Içamento")
-                st.dataframe(result_lifting.T, use_container_width=True)
+                st.dataframe(dados_icamento)
                 st.subheader("Informações do Guindauto")
-                st.dataframe(result_crane.set_index(result_crane.columns[0]).T, use_container_width=True) # Exibição transposta melhorada
+                st.dataframe(dados_guindauto)
         else:
             st.warning(f"Nenhum registro completo encontrado para o ID: {search_id}.")
 
@@ -161,29 +159,20 @@ def show_history_page():
 
     with tab1:
         if not df_lifting.empty:
-            st.dataframe(df_lifting, use_container_width=True)
+            st.dataframe(df_lifting, use_container_width=True, hide_index=True)
         else:
             st.info("Nenhum histórico de dados de içamento encontrado.")
 
     with tab2:
         if not df_crane.empty:
-            
-            column_config = {}
-            for col_name in df_crane.columns:
-                if "URL" in col_name.upper():
-                    column_config[col_name] = st.column_config.LinkColumn(
-                        "Link do Documento",
-                        display_text="Abrir ↗"  
-                    )
-            
-            st.dataframe(
-                df_crane,
-                use_container_width=True,
-                column_config=column_config,
-                hide_index=True,
-            )
+            column_config = {
+                col_name: st.column_config.LinkColumn("Link", display_text="Abrir ↗")
+                for col_name in df_crane.columns if "URL" in col_name.upper()
+            }
+            st.dataframe(df_crane, use_container_width=True, column_config=column_config, hide_index=True)
         else:
             st.info("Nenhum histórico de informações de guindauto encontrado.")
+
 
 
 
