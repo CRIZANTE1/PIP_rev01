@@ -43,8 +43,9 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
     porcentagem_alcance_max = (carga_total / capacidade_alcance_max) * 100
     porcentagem_segura = max(porcentagem_raio, porcentagem_alcance_max)
     
+    # --- MENSAGEM ALTERADA AQUI ---
     if not angulo_seguro:
-        mensagem = f"ATENÇÃO: Ângulo da lança ({angulo:.1f}°) inferior ao mínimo de segurança do fabricante ({angulo_minimo_fabricante}°). Operação não segura."
+        mensagem = f"ATENÇÃO: O ângulo da lança calculado ({angulo:.1f}°) é inferior ao ângulo mínimo de segurança informado. Operação não segura."
         adequado = False
     elif porcentagem_segura > 80:
         mensagem = "ATENÇÃO: A carga excede 80% da capacidade do guindaste. Consulte a engenharia e equipe de segurança."
@@ -69,6 +70,7 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
             'angulo_minimo_fabricante': angulo_minimo_fabricante
         }
     }
+
 
 
 
