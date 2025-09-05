@@ -22,7 +22,7 @@ def calcular_carga_total(peso_carga, equipamento_novo=True, peso_acessorios=0):
         'margem_seguranca_percentual': margem_seguranca * 100
     }
 
-def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, extensao_lanca=None, angulo_minimo_fabricante=None):
+def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max, extensao_lanca, angulo_minimo_fabricante):
     """Valida se o guindaste é adequado com base em sua capacidade e ângulo."""
 
     if carga_total <= 0:
@@ -33,9 +33,10 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
     if extensao_lanca < raio_max:
         raise ValueError(f"A extensão da lança ({extensao_lanca}m) não pode ser menor que o raio de operação ({raio_max}m).")
 
-
+    # Cálculo do ângulo
     angulo = np.degrees(np.arccos(raio_max / extensao_lanca))
     
+    # Validação do ângulo usando o parâmetro recebido
     angulo_seguro = angulo >= angulo_minimo_fabricante 
 
     porcentagem_raio = (carga_total / capacidade_raio) * 100
@@ -58,7 +59,7 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
         'mensagem': mensagem,
         'detalhes': {
             'raio_max': raio_max,
-            'extensao_lanca': extensao_lanca, 
+            'extensao_lanca': extensao_lanca,
             'capacidade_raio': capacidade_raio,
             'capacidade_alcance': capacidade_alcance_max,
             'porcentagem_raio': porcentagem_raio,
@@ -68,5 +69,6 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
             'angulo_minimo_fabricante': angulo_minimo_fabricante
         }
     }
+
 
 
