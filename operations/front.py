@@ -119,7 +119,6 @@ def front_page():
         with col_inputs:
             st.subheader("Parâmetros da Operação")
             
-            # Usar `key` em todos os inputs para salvar no session_state
             st.radio(
                 "Estado do Equipamento", 
                 ["Novo", "Usado"], 
@@ -127,6 +126,13 @@ def front_page():
                 help="Novo: 10% de margem. Usado: 25%."
             )
             
+            # --- CORREÇÃO AQUI: ADICIONANDO O ALERTA VISUAL DE VOLTA ---
+            if st.session_state.estado_equip_radio == "Novo":
+                st.info("Margem de segurança de 10% aplicada.")
+            else:
+                st.warning("⚠️ Margem de segurança de 25% aplicada para equipamento usado.")
+            # --- FIM DA CORREÇÃO ---
+
             st.number_input("Peso da carga (kg)", min_value=0.1, step=100.0, key="peso_carga")
             st.number_input("Peso dos acessórios (kg)", min_value=0.0, step=1.0, key="peso_acessorios")
 
@@ -153,20 +159,23 @@ def front_page():
         with col_results:
             st.subheader("Resultados e Análise em Tempo Real")
             
-            # Verifica se todos os inputs necessários foram preenchidos
+            # Garante que o estado do radio exista antes de prosseguir
+            if 'estado_equip_radio' not in st.session_state:
+                st.session_state.estado_equip_radio = "Novo" # Define um padrão inicial
+            
             inputs_validos = all([
-                st.session_state.peso_carga > 0,
-                st.session_state.raio_max > 0,
-                st.session_state.capacidade_raio > 0,
-                st.session_state.extensao_lanca > 0,
-                st.session_state.capacidade_alcance > 0
+                st.session_state.get("peso_carga", 0) > 0,
+                st.session_state.get("raio_max", 0) > 0,
+                st.session_state.get("capacidade_raio", 0) > 0,
+                st.session_state.get("extensao_lanca", 0) > 0,
+                st.session_state.get("capacidade_alcance", 0) > 0
             ])
 
             if not inputs_validos:
                 st.info("📊 Preencha todos os parâmetros à esquerda para ver os resultados e o diagrama.")
             else:
                 try:
-                    # Realiza os cálculos usando os valores do session_state
+                    # O cálculo JÁ ESTAVA CORRETO, usando o valor do radio button
                     equip_novo = st.session_state.estado_equip_radio == "Novo"
                     resultado_calc = calcular_carga_total(st.session_state.peso_carga, equip_novo, st.session_state.peso_acessorios)
                     
@@ -179,21 +188,19 @@ def front_page():
                         angulo_minimo_fabricante=st.session_state.angulo_minimo_input
                     )
 
-                    # Armazena os resultados no session_state para a Aba 2
                     st.session_state.dados_icamento = {
                         **resultado_calc,
                         'fabricante_guindaste': st.session_state.fabricante_guindaste_calc,
                         'nome_guindaste': st.session_state.nome_guindaste_calc,
-                        'modelo_guindaste': "", # Modelo opcional removido para simplificar a UI
+                        'modelo_guindaste': "",
                         'raio_max': st.session_state.raio_max,
                         'capacidade_raio': st.session_state.capacidade_raio,
                         'extensao_lanca': st.session_state.extensao_lanca,
                         'capacidade_alcance': st.session_state.capacidade_alcance,
                         'angulo_minimo_fabricante': st.session_state.angulo_minimo_input,
-                        'validacao': validacao # Adiciona a validação aos dados salvos
+                        'validacao': validacao
                     }
 
-                    # --- Exibição dos Resultados ---
                     mensagem_validacao = validacao.get('mensagem', 'Falha na validação.')
                     if "INSEGURA" in mensagem_validacao.upper():
                         st.error(f"❌ {mensagem_validacao}")
@@ -213,7 +220,6 @@ def front_page():
                         use_container_width=True
                     )
 
-                    # Tabela de resultados e métricas em colunas
                     col_tabela, col_metricas = st.columns(2)
                     with col_tabela:
                         st.dataframe(pd.DataFrame({
@@ -235,7 +241,6 @@ def front_page():
                         st.metric("Utilização na Lança", f"{detalhes.get('porcentagem_alcance', 0):.1f}%")
                 
                 except ValueError as e:
-                    # Captura erros de lógica (ex: raio > lança) e exibe de forma amigável
                     st.error(f"⚠️ Erro de Validação: {e}")
                 except Exception as e:
                     st.error(f"Ocorreu um erro inesperado: {e}")
@@ -398,6 +403,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
