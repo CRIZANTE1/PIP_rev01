@@ -136,7 +136,7 @@ def front_page():
                 raio_max = st.number_input("Raio Máximo (m)", min_value=0.1, step=0.1)
                 capacidade_raio = st.number_input("Capacidade no Raio Máximo (kg)", min_value=0.1, step=100.0)
             with col4:
-                alcance_max = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
+                extensao_lanca = st.number_input("Extensão Máxima da Lança (m)", min_value=0.1, step=0.1)
                 capacidade_alcance = st.number_input("Capacidade na Lança Máxima (kg)", min_value=0.1, step=100.0)
                 angulo_minimo_fabricante = st.number_input("Ângulo Mínimo da Lança (°)", min_value=1.0, max_value=89.0, value=40.0)
             
@@ -355,6 +355,7 @@ def front_page():
                     del st.session_state[key]
                 st.warning("⚠️ Formulário limpo.")
                 st.rerun()
+
 
 
 
