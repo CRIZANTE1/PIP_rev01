@@ -22,16 +22,20 @@ def calcular_carga_total(peso_carga, equipamento_novo=True, peso_acessorios=0):
         'margem_seguranca_percentual': margem_seguranca * 100
     }
 
-def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, alcance_max=None, angulo_minimo_fabricante=45.0): # MUDANÇA 1: Adicionado novo parâmetro
+def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio_max=None, extensao_lanca=None, angulo_minimo_fabricante=45.0):
     """Valida se o guindaste é adequado com base em sua capacidade e ângulo."""
 
     if carga_total <= 0:
         raise ValueError("A carga total deve ser um valor positivo.")
     if capacidade_raio <= 0 or capacidade_alcance_max <= 0:
         raise ValueError("As capacidades do guindaste devem ser valores positivos.")
-   
-    angulo = np.degrees(np.arctan2(alcance_max, raio_max))
-    # MUDANÇA 2: A validação agora usa o ângulo fornecido pelo fabricante
+    
+    if extensao_lanca < raio_max:
+        raise ValueError(f"A extensão da lança ({extensao_lanca}m) não pode ser menor que o raio de operação ({raio_max}m).")
+
+
+    angulo = np.degrees(np.arccos(raio_max / extensao_lanca))
+    
     angulo_seguro = angulo >= angulo_minimo_fabricante 
 
     porcentagem_raio = (carga_total / capacidade_raio) * 100
@@ -39,7 +43,6 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
     porcentagem_segura = max(porcentagem_raio, porcentagem_alcance_max)
     
     if not angulo_seguro:
-        # MUDANÇA 3: A mensagem de erro agora é dinâmica e mais clara
         mensagem = f"ATENÇÃO: Ângulo da lança ({angulo:.1f}°) inferior ao mínimo de segurança do fabricante ({angulo_minimo_fabricante}°). Operação não segura."
         adequado = False
     elif porcentagem_segura > 80:
@@ -55,13 +58,13 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max, raio
         'mensagem': mensagem,
         'detalhes': {
             'raio_max': raio_max,
-            'alcance_max': alcance_max,
+            'extensao_lanca': extensao_lanca, 
             'capacidade_raio': capacidade_raio,
             'capacidade_alcance': capacidade_alcance_max,
             'porcentagem_raio': porcentagem_raio,
             'porcentagem_alcance': porcentagem_alcance_max,
             'angulo_lanca': angulo,
             'angulo_seguro': angulo_seguro,
-            'angulo_minimo_fabricante': angulo_minimo_fabricante 
+            'angulo_minimo_fabricante': angulo_minimo_fabricante
         }
     }
