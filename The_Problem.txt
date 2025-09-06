@@ -1,0 +1,9 @@
+O Problema 
+O Desafio Atual no Planejamento de Içamentos
+Tópico Principal 
+Atualmente, nossas análises são predominantemente qualitativas, baseadas na experiência.
+Sub-tópicos (as consequências disso):
+Ausência de Verificação Quantitativa: Não possuímos uma ferramenta para validar matematicamente se a operação está dentro dos limites de segurança.
+Dependência da Experiência Individual: A segurança depende muito do conhecimento e da percepção de cada profissional, sem um padrão numérico de checagem.
+Risco Não-Mensurado: Sem cálculos, é difícil quantificar o nível de risco de uma operação, especialmente em cenários não-rotineiros.
+Falta de Rastreabilidade: Não há um registro formal e padronizado dos cálculos de segurança para consultas futuras ou auditorias.
