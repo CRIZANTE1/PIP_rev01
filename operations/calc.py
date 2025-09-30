@@ -211,7 +211,7 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max,
     # Verifica se excede o limite de 80%
     if porcentagem_segura > LIMITE_SEGURANCA:
         adequado = False
-        mensagem = (
+        mensagem_capacidade = (
             f"OPERAÇÃO INSEGURA: A carga ({carga_total:.2f}kg) excede {LIMITE_SEGURANCA}% "
             f"da capacidade do guindaste. Utilização atual: {porcentagem_segura:.1f}%. "
             f"Esta operação requer análise adicional da engenharia."
@@ -220,11 +220,12 @@ def validar_guindaste(carga_total, capacidade_raio, capacidade_alcance_max,
             f"Capacidade excedida: {porcentagem_segura:.1f}% "
             f"(Raio: {porcentagem_raio:.1f}%, Alcance: {porcentagem_alcance_max:.1f}%)"
         )
-    
-    # Se já estava com problema de ângulo, mantém a mensagem de ângulo
-    # mas adiciona informação de capacidade se também for problema
-    if "INSEGURA" in mensagem and porcentagem_segura > LIMITE_SEGURANCA:
-        mensagem += f" Adicionalmente, a utilização da capacidade está em {porcentagem_segura:.1f}%."
+        
+        # Se já estava com problema de ângulo, concatena as mensagens
+        if "INSEGURA" in mensagem or "ATENÇÃO" in mensagem:
+            mensagem = f"{mensagem} {mensagem_capacidade}"
+        else:
+            mensagem = mensagem_capacidade
     
     # ==================== PREPARAÇÃO DO RESULTADO ====================
     
@@ -301,6 +302,7 @@ def calcular_fator_seguranca(carga_total, capacidade):
         raise ValueError("Valores devem ser positivos para cálculo do fator de segurança")
     
     return capacidade / carga_total
+
 
 
 
