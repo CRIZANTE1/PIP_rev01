@@ -66,37 +66,67 @@ def mostrar_instrucoes():
 
 
 def gerar_id_avaliacao():
+    """Gera um ID único para a avaliação"""
     return f"AV{datetime.now().strftime('%Y%m%d')}-{str(uuid.uuid4())[:8]}"
 
+
 def handle_upload_with_id(uploader, arquivo, tipo_doc, id_avaliacao):
+    """
+    Gerencia o upload de arquivos com validações completas.
+    
+    Args:
+        uploader: Instância do GoogleDriveUploader
+        arquivo: Arquivo para upload
+        tipo_doc: Tipo do documento (ex: 'cnh_doc', 'crlv')
+        id_avaliacao: ID da avaliação atual
+        
+    Returns:
+        dict: {'success': bool, 'url': str, 'nome': str} ou {'success': False, 'error': str}
+    """
     if arquivo is None: 
         return None
     
-    # Validação de tipo de arquivo
-    extensao = arquivo.name.split('.')[-1].lower()
-    tipos_permitidos = ['pdf', 'png', 'jpg', 'jpeg']
-    
-    if extensao not in tipos_permitidos:
-        st.error(f"Tipo de arquivo não permitido: .{extensao}. Use: {', '.join(tipos_permitidos)}")
-        return {'success': False, 'error': f'Tipo não permitido: .{extensao}'}
-    
-    # Validação de tamanho (10MB máximo)
-    if hasattr(arquivo, 'size') and arquivo.size > 10 * 1024 * 1024:
-        st.error(f"Arquivo muito grande ({arquivo.size / 1024 / 1024:.1f}MB). Máximo: 10MB")
-        return {'success': False, 'error': 'Arquivo muito grande'}
-    
-    novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
     try:
+        # Validação de tipo de arquivo
+        if not hasattr(arquivo, 'name') or not arquivo.name:
+            st.error("Arquivo inválido: nome não identificado")
+            return {'success': False, 'error': 'Nome do arquivo inválido'}
+        
+        extensao = arquivo.name.split('.')[-1].lower()
+        tipos_permitidos = ['pdf', 'png', 'jpg', 'jpeg']
+        
+        if extensao not in tipos_permitidos:
+            st.error(f"Tipo de arquivo não permitido: .{extensao}. Use: {', '.join(tipos_permitidos)}")
+            return {'success': False, 'error': f'Tipo não permitido: .{extensao}'}
+        
+        # Validação de tamanho (10MB máximo)
+        if hasattr(arquivo, 'size') and arquivo.size:
+            tamanho_mb = arquivo.size / (1024 * 1024)
+            if tamanho_mb > 10:
+                st.error(f"Arquivo muito grande ({tamanho_mb:.1f}MB). Máximo: 10MB")
+                return {'success': False, 'error': f'Arquivo muito grande: {tamanho_mb:.1f}MB'}
+        
+        # Upload do arquivo
+        novo_nome = f"{id_avaliacao}_{tipo_doc}.{extensao}"
         file_url = uploader.upload_file(arquivo, novo_nome)
-        return {'success': True, 'url': file_url, 'nome': novo_nome}
+        
+        if file_url:
+            return {'success': True, 'url': file_url, 'nome': novo_nome}
+        else:
+            st.error(f"Falha no upload: URL não retornada para '{novo_nome}'")
+            return {'success': False, 'error': 'URL não retornada'}
+            
     except Exception as e:
-        st.error(f"Erro no upload de '{novo_nome}': {e}")
-        logging.exception(f"Erro no upload de {novo_nome}")
+        st.error(f"Erro no upload de '{tipo_doc}': {e}")
+        logging.exception(f"Erro no upload de {tipo_doc}")
         return {'success': False, 'error': str(e)}
 
+
 def display_status(status_text):
+    """Exibe o status de um documento com formatação apropriada"""
     if not status_text: 
         return
+    
     status_lower = status_text.lower()
     if "válido" in status_lower or "em dia" in status_lower:
         st.success(f"Status: {status_text}")
@@ -104,6 +134,7 @@ def display_status(status_text):
         st.error(f"Status: {status_text}")
     else:
         st.warning(f"Status: {status_text}")
+
 
 def inicializar_session_state():
     """Inicializa todos os campos do session_state com valores padrão"""
@@ -150,8 +181,14 @@ def inicializar_session_state():
     if 'dados_icamento' not in st.session_state: 
         st.session_state.dados_icamento = {}
 
+
 def validar_inputs_calculo():
-    """Valida se todos os inputs necessários para o cálculo estão preenchidos corretamente"""
+    """
+    Valida se todos os inputs necessários para o cálculo estão preenchidos corretamente.
+    
+    Returns:
+        tuple: (bool, dict) - (todos_validos, dicionário de checks individuais)
+    """
     try:
         # Verifica se todos os campos existem e têm valores válidos
         checks = {
@@ -160,15 +197,46 @@ def validar_inputs_calculo():
             'capacidade_raio': st.session_state.get("capacidade_raio", 0) > 0,
             'extensao_lanca': st.session_state.get("extensao_lanca", 0) > 0,
             'capacidade_alcance': st.session_state.get("capacidade_alcance", 0) > 0,
-            'estado_equipamento': st.session_state.get("estado_equip_radio") in ["Novo", "Usado"]
+            'estado_equipamento': st.session_state.get("estado_equip_radio") in ["Novo", "Usado"],
+            'angulo_minimo': 1 <= st.session_state.get("angulo_minimo_input", 40) <= 89
         }
         
         return all(checks.values()), checks
+        
     except (KeyError, TypeError, AttributeError) as e:
         logging.error(f"Erro na validação de inputs: {e}")
         return False, {}
 
+
+def validar_geometria_guindaste(raio, extensao):
+    """
+    Valida a geometria da configuração do guindaste.
+    
+    Args:
+        raio: Raio de operação em metros
+        extensao: Extensão da lança em metros
+        
+    Returns:
+        tuple: (bool, str) - (é_válido, mensagem)
+    """
+    if raio <= 0 or extensao <= 0:
+        return False, "Raio e extensão devem ser valores positivos"
+    
+    if extensao <= raio:
+        return False, f"A extensão da lança ({extensao}m) deve ser MAIOR que o raio de operação ({raio}m)"
+    
+    if extensao == raio:
+        return False, "Configuração crítica: raio igual à extensão (ângulo 0°)"
+    
+    # Verificação adicional: raio não pode ser mais de 99% da extensão (ângulo muito baixo)
+    if raio > (extensao * 0.99):
+        return False, f"Ângulo resultante muito baixo. Aumente a extensão da lança ou reduza o raio"
+    
+    return True, "Geometria válida"
+
+
 def front_page():
+    """Página principal da calculadora de içamento"""
     # Inicialização do session_state
     inicializar_session_state()
     
@@ -183,6 +251,7 @@ def front_page():
 
         # --- Coluna de Inputs (à Esquerda) ---
         col_inputs, col_results = st.columns([1, 2], gap="large")
+        
         with col_inputs:
             st.subheader("Parâmetros da Operação")
             
@@ -206,6 +275,7 @@ def front_page():
                 key="peso_carga",
                 help="Peso principal do item a ser içado"
             )
+            
             st.number_input(
                 "Peso dos acessórios (kg)", 
                 min_value=0.0, 
@@ -221,6 +291,7 @@ def front_page():
                 key="fabricante_guindaste_calc",
                 placeholder="Ex: Liebherr, Grove, Terex"
             )
+            
             st.text_input(
                 "Nome do Guindaste", 
                 key="nome_guindaste_calc", 
@@ -234,6 +305,7 @@ def front_page():
                 key="raio_max",
                 help="Distância horizontal do centro do guindaste até o ponto de içamento"
             )
+            
             st.number_input(
                 "Capacidade no Raio (kg)", 
                 min_value=0.0, 
@@ -249,6 +321,7 @@ def front_page():
                 key="extensao_lanca",
                 help="Comprimento total da lança do guindaste"
             )
+            
             st.number_input(
                 "Capacidade na Lança (kg)", 
                 min_value=0.0, 
@@ -285,12 +358,22 @@ def front_page():
             else:
                 try:
                     # Validação de geometria antes do cálculo
-                    if st.session_state.extensao_lanca < st.session_state.raio_max:
-                        st.error("⚠️ ERRO: A extensão da lança não pode ser menor que o raio de operação!")
-                        st.warning(f"Extensão da lança: {st.session_state.extensao_lanca}m | Raio: {st.session_state.raio_max}m")
+                    geometria_valida, msg_geometria = validar_geometria_guindaste(
+                        st.session_state.raio_max,
+                        st.session_state.extensao_lanca
+                    )
+                    
+                    if not geometria_valida:
+                        st.error(f"⚠️ ERRO DE CONFIGURAÇÃO: {msg_geometria}")
+                        st.warning(
+                            f"**Valores informados:**\n"
+                            f"- Extensão da lança: {st.session_state.extensao_lanca}m\n"
+                            f"- Raio de operação: {st.session_state.raio_max}m"
+                        )
                     else:
                         # Cálculo da carga total
                         equip_novo = st.session_state.estado_equip_radio == "Novo"
+                        
                         resultado_calc = calcular_carga_total(
                             st.session_state.peso_carga, 
                             equip_novo, 
@@ -323,6 +406,7 @@ def front_page():
 
                         # Exibir mensagem de validação
                         mensagem_validacao = validacao.get('mensagem', 'Falha na validação.')
+                        
                         if "INSEGURA" in mensagem_validacao.upper():
                             st.error(f"❌ {mensagem_validacao}")
                         elif "ATENÇÃO" in mensagem_validacao.upper():
@@ -331,21 +415,24 @@ def front_page():
                             st.success(f"✅ {mensagem_validacao}")
                         
                         # Diagrama
-                        st.plotly_chart(
-                            criar_diagrama_guindaste(
+                        try:
+                            diagrama = criar_diagrama_guindaste(
                                 st.session_state.raio_max, 
                                 st.session_state.extensao_lanca, 
                                 resultado_calc['carga_total'], 
                                 st.session_state.capacidade_raio, 
                                 st.session_state.angulo_minimo_input
-                            ), 
-                            use_container_width=True
-                        )
+                            )
+                            st.plotly_chart(diagrama, use_container_width=True)
+                        except Exception as e:
+                            st.error(f"Erro ao gerar diagrama: {e}")
+                            logging.exception("Erro ao gerar diagrama")
 
                         # Tabelas e métricas
                         col_tabela, col_metricas = st.columns(2)
+                        
                         with col_tabela:
-                            st.dataframe(pd.DataFrame({
+                            df_calculo = pd.DataFrame({
                                 'Descrição': [
                                     'Peso Carga', 
                                     'Margem (%)', 
@@ -362,7 +449,8 @@ def front_page():
                                     f"{resultado_calc.get('peso_cabos', 0):.2f}",
                                     f"**{resultado_calc.get('carga_total', 0):.2f}**"
                                 ]
-                            }), hide_index=True)
+                            })
+                            st.dataframe(df_calculo, hide_index=True, use_container_width=True)
                         
                         with col_metricas:
                             detalhes = validacao.get('detalhes', {})
@@ -373,6 +461,7 @@ def front_page():
                 except ValueError as e:
                     st.error(f"⚠️ Erro de Validação: {e}")
                     logging.error(f"ValueError no cálculo: {e}")
+                    
                 except Exception as e:
                     st.error(f"❌ Ocorreu um erro inesperado: {e}")
                     logging.exception("Erro inesperado no cálculo de içamento")
@@ -384,8 +473,13 @@ def front_page():
         st.header("Informações e Documentos do Guindauto")
         st.info(f"ID da Avaliação: **{st.session_state.id_avaliacao}**")
         
-        uploader = GoogleDriveUploader()
-        ai_processor = PDFQA()
+        try:
+            uploader = GoogleDriveUploader()
+            ai_processor = PDFQA()
+        except Exception as e:
+            st.error(f"Erro ao inicializar serviços: {e}")
+            logging.exception("Erro ao inicializar GoogleDriveUploader ou PDFQA")
+            return
         
         st.subheader("📋 Dados da Empresa")
         col_c1, col_c2 = st.columns(2)
@@ -406,17 +500,21 @@ def front_page():
         
         if st.session_state.get('cnh_doc_file') and st.button("2. Extrair e Validar CNH com IA", key="cnh_button"):
             with st.spinner("Processando CNH com IA..."):
-                extracted = ai_processor.extract_structured_data(
-                    st.session_state.cnh_doc_file, 
-                    get_cnh_prompt()
-                )
-                if extracted:
-                    st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
-                    st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
-                    st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form)
-                    st.session_state.cnh_validade_form = extracted.get('validade_cnh', st.session_state.cnh_validade_form)
-                    st.session_state.cnh_status = extracted.get('status', 'Falha na verificação')
-                    st.rerun()
+                try:
+                    extracted = ai_processor.extract_structured_data(
+                        st.session_state.cnh_doc_file, 
+                        get_cnh_prompt()
+                    )
+                    if extracted:
+                        st.session_state.operador_form = extracted.get('nome', st.session_state.operador_form)
+                        st.session_state.cpf_form = extracted.get('cpf', st.session_state.cpf_form)
+                        st.session_state.cnh_form = extracted.get('numero_cnh', st.session_state.cnh_form)
+                        st.session_state.cnh_validade_form = extracted.get('validade_cnh', st.session_state.cnh_validade_form)
+                        st.session_state.cnh_status = extracted.get('status', 'Falha na verificação')
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao processar CNH: {e}")
+                    logging.exception("Erro ao processar CNH")
         
         col_op1, col_op2 = st.columns(2)
         with col_op1: 
@@ -437,15 +535,19 @@ def front_page():
         
         if st.session_state.get('crlv_file') and st.button("🔍 Extrair Dados do CRLV", key="crlv_button"):
             with st.spinner("Processando CRLV com IA..."):
-                extracted = ai_processor.extract_structured_data(
-                    st.session_state.crlv_file, 
-                    get_crlv_prompt()
-                )
-                if extracted: 
-                    st.session_state.placa_form = extracted.get('placa', st.session_state.placa_form)
-                    st.session_state.ano_form = extracted.get('ano_fabricacao', st.session_state.ano_form)
-                    st.session_state.modelo_form = extracted.get('marca_modelo', st.session_state.modelo_form)
-                    st.rerun()
+                try:
+                    extracted = ai_processor.extract_structured_data(
+                        st.session_state.crlv_file, 
+                        get_crlv_prompt()
+                    )
+                    if extracted: 
+                        st.session_state.placa_form = extracted.get('placa', st.session_state.placa_form)
+                        st.session_state.ano_form = extracted.get('ano_fabricacao', st.session_state.ano_form)
+                        st.session_state.modelo_form = extracted.get('marca_modelo', st.session_state.modelo_form)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao processar CRLV: {e}")
+                    logging.exception("Erro ao processar CRLV")
         
         col_e1, col_e2 = st.columns(2)
         with col_e1: 
@@ -468,15 +570,20 @@ def front_page():
             ) 
             if st.session_state.get('art_file') and st.button("Verificar ART", key="art_button"):
                 with st.spinner("Verificando ART..."):
-                    extracted = ai_processor.extract_structured_data(
-                        st.session_state.art_file, 
-                        get_art_prompt()
-                    )
-                    if extracted: 
-                        st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form)
-                        st.session_state.art_validade_form = extracted.get('validade_art', st.session_state.art_validade_form)
-                        st.session_state.art_status = extracted.get('status', 'Falha na verificação')
-                        st.rerun()
+                    try:
+                        extracted = ai_processor.extract_structured_data(
+                            st.session_state.art_file, 
+                            get_art_prompt()
+                        )
+                        if extracted: 
+                            st.session_state.art_num_form = extracted.get('numero_art', st.session_state.art_num_form)
+                            st.session_state.art_validade_form = extracted.get('validade_art', st.session_state.art_validade_form)
+                            st.session_state.art_status = extracted.get('status', 'Falha na verificação')
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar ART: {e}")
+                        logging.exception("Erro ao processar ART")
+            
             st.text_input("Nº ART", key="art_num_form")
             st.text_input("Validade ART", key="art_validade_form", disabled=True)
             display_status(st.session_state.get('art_status'))
@@ -491,15 +598,20 @@ def front_page():
             ) 
             if st.session_state.get('nr11_file') and st.button("Verificar NR-11", key="nr11_button"): 
                 with st.spinner("Verificando NR-11..."):
-                    extracted = ai_processor.extract_structured_data(
-                        st.session_state.nr11_file, 
-                        get_nr11_prompt()
-                    )
-                    if extracted:
-                        st.session_state.nr11_modulo_form = extracted.get('modulo', st.session_state.nr11_modulo_form)
-                        st.session_state.nr11_validade_form = extracted.get('validade_nr11', st.session_state.nr11_validade_form)
-                        st.session_state.nr11_status = extracted.get('status', 'Falha na verificação')
-                        st.rerun()
+                    try:
+                        extracted = ai_processor.extract_structured_data(
+                            st.session_state.nr11_file, 
+                            get_nr11_prompt()
+                        )
+                        if extracted:
+                            st.session_state.nr11_modulo_form = extracted.get('modulo', st.session_state.nr11_modulo_form)
+                            st.session_state.nr11_validade_form = extracted.get('validade_nr11', st.session_state.nr11_validade_form)
+                            st.session_state.nr11_status = extracted.get('status', 'Falha na verificação')
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar NR-11: {e}")
+                        logging.exception("Erro ao processar NR-11")
+            
             modulos_nr11 = ["", "Guindauto", "Guindaste", "Munck"]
             if st.session_state.nr11_modulo_form and st.session_state.nr11_modulo_form not in modulos_nr11: 
                 modulos_nr11.append(st.session_state.nr11_modulo_form)
@@ -517,15 +629,20 @@ def front_page():
             ) 
             if st.session_state.get('mprev_file') and st.button("Verificar Manutenção", key="mprev_button"): 
                 with st.spinner("Verificando Manutenção..."):
-                    extracted = ai_processor.extract_structured_data(
-                        st.session_state.mprev_file, 
-                        get_mprev_prompt()
-                    )
-                    if extracted: 
-                        st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', st.session_state.mprev_data_form)
-                        st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', st.session_state.mprev_prox_form)
-                        st.session_state.mprev_status = extracted.get('status', 'Falha na verificação')
-                        st.rerun()
+                    try:
+                        extracted = ai_processor.extract_structured_data(
+                            st.session_state.mprev_file, 
+                            get_mprev_prompt()
+                        )
+                        if extracted: 
+                            st.session_state.mprev_data_form = extracted.get('data_ultima_manutencao', st.session_state.mprev_data_form)
+                            st.session_state.mprev_prox_form = extracted.get('data_proxima_manutencao', st.session_state.mprev_prox_form)
+                            st.session_state.mprev_status = extracted.get('status', 'Falha na verificação')
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao processar Manutenção: {e}")
+                        logging.exception("Erro ao processar Manutenção")
+            
             st.text_input("Última Manutenção", key="mprev_data_form", disabled=True)
             st.text_input("Próxima Manutenção", key="mprev_prox_form", disabled=True)
             display_status(st.session_state.get('mprev_status'))
@@ -542,6 +659,7 @@ def front_page():
         st.divider()
        
         col_s1, col_s2 = st.columns(2)
+        
         with col_s1:
             if st.button("💾 Salvar Todas as Informações", type="primary", use_container_width=True):
                 if not st.session_state.dados_icamento:
@@ -563,42 +681,52 @@ def front_page():
                             ]
                             
                             for state_key, upload_key, doc_type in files_to_upload:
-                                if st.session_state.get(state_key):
+                                arquivo = st.session_state.get(state_key)
+                                if arquivo:
                                     result = handle_upload_with_id(
                                         uploader, 
-                                        st.session_state[state_key], 
+                                        arquivo, 
                                         doc_type, 
                                         id_avaliacao
                                     )
                                     if result and result.get('success'):
                                         uploads[upload_key] = result
+                                        logging.info(f"Upload bem-sucedido: {doc_type}")
                                     else:
-                                        st.warning(f"Falha no upload de {doc_type}")
+                                        error_msg = result.get('error', 'Erro desconhecido') if result else 'Resultado nulo'
+                                        st.warning(f"Falha no upload de {doc_type}: {error_msg}")
+                                        logging.warning(f"Falha no upload de {doc_type}: {error_msg}")
                             
-                            # Função auxiliar para obter URLs
-                            get_url = lambda key: uploads.get(key, {}).get('url', '')
+                            # Função auxiliar para obter URLs de forma segura
+                            def get_url(key):
+                                """Retorna a URL do upload ou string vazia se não existir"""
+                                try:
+                                    return uploads.get(key, {}).get('url', '')
+                                except Exception as e:
+                                    logging.error(f"Erro ao obter URL para {key}: {e}")
+                                    return ''
                             
                             # Preparar linha de dados do guindauto
                             dados_guindauto_row = [
                                 id_avaliacao,
-                                st.session_state.empresa_form,
-                                st.session_state.cnpj_form,
-                                st.session_state.telefone_form,
-                                st.session_state.email_form,
-                                st.session_state.operador_form,
-                                st.session_state.cpf_form,
-                                st.session_state.cnh_form,
-                                st.session_state.cnh_validade_form,
-                                st.session_state.nr11_modulo_form,
-                                st.session_state.placa_form,
-                                st.session_state.modelo_form,
-                                st.session_state.fabricante_form,
-                                st.session_state.ano_form,
-                                st.session_state.mprev_data_form,
-                                st.session_state.mprev_prox_form,
-                                st.session_state.art_num_form,
-                                st.session_state.art_validade_form,
-                                st.session_state.obs_form,
+                                st.session_state.empresa_form or "",
+                                st.session_state.cnpj_form or "",
+                                st.session_state.telefone_form or "",
+                                st.session_state.email_form or "",
+                                st.session_state.operador_form or "",
+                                st.session_state.cpf_form or "",
+                                st.session_state.cnh_form or "",
+                                st.session_state.cnh_validade_form or "",
+                                st.session_state.nr11_modulo_form or "",
+                                st.session_state.placa_form or "",
+                                st.session_state.modelo_form or "",
+                                st.session_state.fabricante_form or "",
+                                st.session_state.ano_form or "",
+                                st.session_state.mprev_data_form or "",
+                                st.session_state.mprev_prox_form or "",
+                                st.session_state.art_num_form or "",
+                                st.session_state.art_validade_form or "",
+                                st.session_state.obs_form or "",
                                 get_url('art_doc'),
                                 get_url('nr11_doc'),
                                 get_url('cnh_doc'),
@@ -612,50 +740,68 @@ def front_page():
                             v_icamento = d_icamento.get('validacao', {})
                             det_icamento = v_icamento.get('detalhes', {})
                             
+                            # Função auxiliar para obter valores com segurança
+                            def safe_get(dictionary, key, default=0):
+                                """Obtém valor de dicionário com fallback seguro"""
+                                try:
+                                    value = dictionary.get(key, default)
+                                    return value if value is not None else default
+                                except Exception as e:
+                                    logging.error(f"Erro ao obter {key}: {e}")
+                                    return default
+                            
                             dados_icamento_row = [
                                 id_avaliacao,
                                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                d_icamento.get('peso_carga', 0),
-                                d_icamento.get('margem_seguranca_percentual', 0),
-                                d_icamento.get('peso_seguranca', 0),
-                                d_icamento.get('peso_cabos', 0),
-                                d_icamento.get('peso_acessorios', 0),
-                                d_icamento.get('carga_total', 0),
-                                v_icamento.get('adequado', False),
-                                f"{det_icamento.get('porcentagem_raio', 0):.1f}%",
-                                f"{det_icamento.get('porcentagem_alcance', 0):.1f}%",
-                                d_icamento.get('fabricante_guindaste', ''),
-                                d_icamento.get('nome_guindaste', ''),
-                                d_icamento.get('modelo_guindaste', ''),
-                                d_icamento.get('raio_max', 0),
-                                d_icamento.get('capacidade_raio', 0),
-                                d_icamento.get('extensao_lanca', 0),
-                                d_icamento.get('capacidade_alcance', 0),
-                                d_icamento.get('angulo_minimo_fabricante', 40)
+                                safe_get(d_icamento, 'peso_carga', 0),
+                                safe_get(d_icamento, 'margem_seguranca_percentual', 0),
+                                safe_get(d_icamento, 'peso_seguranca', 0),
+                                safe_get(d_icamento, 'peso_cabos', 0),
+                                safe_get(d_icamento, 'peso_acessorios', 0),
+                                safe_get(d_icamento, 'carga_total', 0),
+                                safe_get(v_icamento, 'adequado', False),
+                                f"{safe_get(det_icamento, 'porcentagem_raio', 0):.1f}%",
+                                f"{safe_get(det_icamento, 'porcentagem_alcance', 0):.1f}%",
+                                safe_get(d_icamento, 'fabricante_guindaste', ''),
+                                safe_get(d_icamento, 'nome_guindaste', ''),
+                                safe_get(d_icamento, 'modelo_guindaste', ''),
+                                safe_get(d_icamento, 'raio_max', 0),
+                                safe_get(d_icamento, 'capacidade_raio', 0),
+                                safe_get(d_icamento, 'extensao_lanca', 0),
+                                safe_get(d_icamento, 'capacidade_alcance', 0),
+                                safe_get(d_icamento, 'angulo_minimo_fabricante', 40)
                             ]
 
                             # Salvar nas planilhas
                             try:
+                                # Salvar dados de içamento
                                 uploader.append_data_to_sheet(LIFTING_SHEET_NAME, dados_icamento_row)
+                                logging.info(f"Dados de içamento salvos: {id_avaliacao}")
+                                
+                                # Salvar dados do guindauto
                                 uploader.append_data_to_sheet(CRANE_SHEET_NAME, dados_guindauto_row)
+                                logging.info(f"Dados do guindauto salvos: {id_avaliacao}")
                                 
                                 st.success(f"✅ Operação registrada com sucesso! ID: {id_avaliacao}")
                                 st.balloons()
                                 
-                                # Limpeza da sessão
+                                # Limpeza da sessão após salvamento bem-sucedido
                                 keys_to_clear = [
                                     k for k in st.session_state.keys() 
-                                    if 'form' in k or '_file' in k or 'id_avaliacao' in k 
-                                    or 'dados_icamento' in k or 'status' in k
+                                    if 'form' in k or '_file' in k or k == 'id_avaliacao' 
+                                    or k == 'dados_icamento' or 'status' in k
                                     or k in ['peso_carga', 'peso_acessorios', 'raio_max', 
                                              'capacidade_raio', 'extensao_lanca', 
                                              'capacidade_alcance', 'fabricante_guindaste_calc',
-                                             'nome_guindaste_calc']
+                                             'nome_guindaste_calc', 'estado_equip_radio',
+                                             'angulo_minimo_input']
                                 ]
                                 
                                 for key in keys_to_clear:
                                     if key in st.session_state:
                                         del st.session_state[key]
+                                
+                                logging.info(f"Session state limpa após salvamento: {id_avaliacao}")
                                 
                                 time.sleep(2)
                                 st.rerun()
@@ -663,31 +809,45 @@ def front_page():
                             except Exception as sheet_error:
                                 st.error(f"❌ Erro ao salvar nos registros: {sheet_error}")
                                 logging.exception("Erro ao salvar nas planilhas")
-                                with st.expander("Detalhes do erro"):
+                                with st.expander("Detalhes do erro ao salvar"):
                                     st.code(str(sheet_error))
+                                    st.json({
+                                        "lifting_sheet": LIFTING_SHEET_NAME,
+                                        "crane_sheet": CRANE_SHEET_NAME,
+                                        "id_avaliacao": id_avaliacao
+                                    })
                                     
                         except Exception as e:
                             st.error(f"❌ Erro durante o processo de salvamento: {e}")
                             logging.exception("Erro no processo de salvamento")
-                            with st.expander("Detalhes técnicos"):
+                            with st.expander("Detalhes técnicos do erro"):
                                 st.code(str(e))
+                                import traceback
+                                st.code(traceback.format_exc())
         
         with col_s2:
             if st.button("🔄 Limpar Formulário", use_container_width=True):
-                keys_to_clear = [
-                    k for k in st.session_state.keys() 
-                    if 'form' in k or '_file' in k or 'id_avaliacao' in k 
-                    or 'dados_icamento' in k or 'status' in k
-                    or k in ['peso_carga', 'peso_acessorios', 'raio_max', 
-                             'capacidade_raio', 'extensao_lanca', 
-                             'capacidade_alcance', 'fabricante_guindaste_calc',
-                             'nome_guindaste_calc']
-                ]
-                
-                for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                
-                st.warning("⚠️ Formulário limpo com sucesso!")
-                time.sleep(1)
-                st.rerun()
+                try:
+                    keys_to_clear = [
+                        k for k in st.session_state.keys() 
+                        if 'form' in k or '_file' in k or k == 'id_avaliacao' 
+                        or k == 'dados_icamento' or 'status' in k
+                        or k in ['peso_carga', 'peso_acessorios', 'raio_max', 
+                                 'capacidade_raio', 'extensao_lanca', 
+                                 'capacidade_alcance', 'fabricante_guindaste_calc',
+                                 'nome_guindaste_calc', 'estado_equip_radio',
+                                 'angulo_minimo_input']
+                    ]
+                    
+                    for key in keys_to_clear:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    
+                    logging.info("Formulário limpo pelo usuário")
+                    st.success("✅ Formulário limpo com sucesso!")
+                    time.sleep(1)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Erro ao limpar formulário: {e}")
+                    logging.exception("Erro ao limpar formulário")
