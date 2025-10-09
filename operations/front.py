@@ -269,11 +269,11 @@ def front_page():
                 st.warning("⚠️ Margem de segurança de 25% aplicada para equipamento usado.")
 
             st.number_input(
-                "Peso da carga (kg)", 
-                min_value=0.0, 
-                step=100.0, 
-                key="peso_carga",
-                help="Peso principal do item a ser içado"
+                "Ângulo Mínimo da Lança (°)", 
+                min_value=1.0, 
+                max_value=89.0, 
+                key="angulo_minimo_input",
+                help="Ângulo mínimo de segurança especificado pelo fabricante"
             )
             
             st.number_input(
@@ -851,3 +851,4 @@ def front_page():
                 except Exception as e:
                     st.error(f"Erro ao limpar formulário: {e}")
                     logging.exception("Erro ao limpar formulário")
+
