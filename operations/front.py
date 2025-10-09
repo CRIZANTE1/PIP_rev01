@@ -334,7 +334,6 @@ def front_page():
                 "Ângulo Mínimo da Lança (°)", 
                 min_value=1.0, 
                 max_value=89.0, 
-                value=40.0,
                 key="angulo_minimo_input",
                 help="Ângulo mínimo de segurança especificado pelo fabricante"
             )
@@ -851,3 +850,4 @@ def front_page():
                 except Exception as e:
                     st.error(f"Erro ao limpar formulário: {e}")
                     logging.exception("Erro ao limpar formulário")
+
